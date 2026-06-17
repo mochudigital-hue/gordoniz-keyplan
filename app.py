@@ -238,16 +238,24 @@ BRAND_DOMAINS = {
 }
 
 def logo_url(name):
-    """Intenta icon.horse para marcas conocidas; adivina dominio para el resto."""
+    """Logo via Google faviconV2 (alta calidad para marcas conocidas)."""
     name_lower = name.lower().strip()
     for brand, domain in BRAND_DOMAINS.items():
         if brand in name_lower:
-            return f"https://icon.horse/icon/{domain}"
-    # Intenta adivinar el dominio a partir del nombre
-    clean = re.sub(r'\s+(espana|spain|madrid|barcelona|es|sl|sa|slu|sll|s\.l\.)$', '', name_lower)
-    clean = re.sub(r'[^a-z0-9]', '', clean)
-    if len(clean) >= 3:
-        return f"https://icon.horse/icon/{clean}.com"
+            return (
+                f"https://t2.gstatic.com/faviconV2"
+                f"?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL"
+                f"&url=https://{domain}&size=128"
+            )
+    # Adivina dominio para el resto
+    clean = re.sub(r"\s+(espana|spain|madrid|barcelona|es|sl|sa|slu)$", "", name_lower)
+    clean = re.sub(r"[^a-z0-9]", "", clean)
+    if len(clean) >= 4:
+        return (
+            f"https://t2.gstatic.com/faviconV2"
+            f"?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL"
+            f"&url=https://{clean}.com&size=128"
+        )
     return ""
 
 
