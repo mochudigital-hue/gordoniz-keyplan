@@ -253,9 +253,9 @@ function renderKeyPlan(data) {
     +'" rx="2" fill="rgba(255,230,150,0.85)" stroke="#E53935" stroke-width="3"/>');
 
   /* 3. Place logos perpendicular to their street */
-  var LOGO_OFF = BAND/2 + 36;   /* center-of-logo distance from band edge */
-  var LOGO_H   = 58;
-  var LOGO_W   = 120;
+  var LOGO_OFF = BAND/2 + 62;   /* center-of-logo distance from band edge */
+  var LOGO_H   = 90;
+  var LOGO_W   = 160;
 
   metas.forEach(function(m) {
     var cosA = Math.cos(m.ang), sinA = Math.sin(m.ang);
@@ -275,8 +275,8 @@ function renderKeyPlan(data) {
       var ly = m.cy + along*sinA + side*LOGO_OFF*ny;
 
       /* Keep within SVG bounds */
-      lx = Math.max(LOGO_W/2+4, Math.min(W - LOGO_W/2 - 4, lx));
-      ly = Math.max(LOGO_H/2+74, Math.min(H - LOGO_H/2 - 4, ly));
+      lx = Math.max(LOGO_W/2+6, Math.min(W - LOGO_W/2 - 6, lx));
+      ly = Math.max(LOGO_H/2+76, Math.min(H - LOGO_H/2 - 6, ly));
       /* Spread logos that land too close together along the street */
       var minAlong = (LOGO_W + 6);
       for (var pi = 0; pi < i; pi++) {
@@ -304,10 +304,11 @@ function renderKeyPlan(data) {
         s.push('</div></foreignObject>');
       } else {
         var label = p.name.length > 18 ? p.name.slice(0,16)+'..' : p.name;
-        s.push('<rect x="'+(lx-54).toFixed(0)+'" y="'+(ly-16).toFixed(0)+'" width="108" height="32"'
-          +' rx="3" fill="white" stroke="#ccc" stroke-width="1"/>');
-        s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+5).toFixed(0)+'" text-anchor="middle"'
-          +' fill="#333" font-family="Arial,sans-serif" font-size="9.5" font-weight="700">'+escH(label)+'</text>');
+        var lw = Math.min(label.length * 9 + 16, 150);
+        s.push('<rect x="'+(lx-lw/2).toFixed(0)+'" y="'+(ly-18).toFixed(0)+'" width="'+lw+'" height="36"'
+          +' rx="4" fill="white" stroke="#bbb" stroke-width="1.5"/>');
+        s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+6).toFixed(0)+'" text-anchor="middle"'
+          +' fill="#222" font-family="Arial,sans-serif" font-size="11" font-weight="700">'+escH(label)+'</text>');
       }
     });
   });

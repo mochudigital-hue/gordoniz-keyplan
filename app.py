@@ -238,6 +238,34 @@ def keyplan():
 
     places = nearby_places(lat, lng, radius, api_key)
 
+    # Solo negocios a pie de calle: excluir alojamiento y tipos no comerciales
+    EXCLUIR_TIPOS = {
+        'lodging', 'real_estate_agency', 'insurance_agency',
+        'lawyer', 'accounting', 'embassy', 'local_government_office',
+        'post_office', 'courthouse', 'city_hall', 'police',
+    }
+    TIPOS_CALLE = {
+        'restaurant','cafe','bar','food','bakery','meal_takeaway','meal_delivery',
+        'fast_food','night_club','casino',
+        'clothing_store','shoe_store','book_store','electronics_store',
+        'supermarket','grocery_or_supermarket','convenience_store',
+        'pharmacy','drugstore','jewelry_store','furniture_store',
+        'home_goods_store','hardware_store','bicycle_store','florist',
+        'gift_shop','toy_store','pet_store','store','shopping_mall',
+        'bank','atm','beauty_salon','hair_care','spa','gym',
+        'movie_theater','amusement_park','art_gallery','museum',
+        'hospital','doctor','dentist','optician',
+        'car_dealer','car_rental','gas_station','parking',
+        'travel_agency','laundry','dry_cleaning',
+    }
+
+    def es_pie_de_calle(tipos):
+        if any(t in EXCLUIR_TIPOS for t in tipos):
+            return False
+        return any(t in TIPOS_CALLE for t in tipos)
+
+    places = [p for p in places if es_pie_de_calle(p.get('types', []))]
+
     by_street = defaultdict(list)
     for p in places:
         street = extract_street(p.get("vicinity", ""))
