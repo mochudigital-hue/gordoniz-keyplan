@@ -298,13 +298,15 @@ function renderKeyPlan(data) {
         ly = Math.max(LOGO_H/2 + 76, Math.min(H - LOGO_H/2 - 6, ly));
         item.p._lx = lx;
         item.p._ly = ly;
+        item.p._cosA = cosA;
+        item.p._sinA = sinA;
         allPlaced.push(item.p);
       });
     });
   });
 
-  /* Phase 3: global push-apart for cross-street overlaps (up to 15 iterations) */
-  for (var iter = 0; iter < 15; iter++) {
+  /* Phase 3: global push-apart — push only along each logo's street axis */
+  for (var iter = 0; iter < 20; iter++) {
     var moved = false;
     for (var ai = 0; ai < allPlaced.length; ai++) {
       for (var bi = ai + 1; bi < allPlaced.length; bi++) {
@@ -313,15 +315,16 @@ function renderKeyPlan(data) {
         var ovX = (LOGO_W + LOGO_GAP) - Math.abs(dx);
         var ovY = (LOGO_H + LOGO_GAP) - Math.abs(dy);
         if (ovX > 0 && ovY > 0) {
-          /* Push along the axis with least overlap */
-          var pushX = 0, pushY = 0;
-          if (ovX <= ovY) {
-            pushX = (dx >= 0 ? 1 : -1) * (ovX / 2 + 1);
-          } else {
-            pushY = (dy >= 0 ? 1 : -1) * (ovY / 2 + 1);
-          }
-          pa._lx -= pushX; pa._ly -= pushY;
-          pb._lx += pushX; pb._ly += pushY;
+          /* Push each logo along ITS OWN street direction (not arbitrary) */
+          var pushAmt = Math.min(ovX, ovY) / 2 + 2;
+          /* For pa: push along its street cosA/sinA */
+          var dotA = dx * pa._cosA + dy * pa._sinA;
+          pa._lx -= pa._cosA * pushAmt * (dotA >= 0 ? 1 : -1);
+          pa._ly -= pa._sinA * pushAmt * (dotA >= 0 ? 1 : -1);
+          /* For pb: push along its street cosA/sinA */
+          var dotB = dx * pb._cosA + dy * pb._sinA;
+          pb._lx += pb._cosA * pushAmt * (dotB >= 0 ? 1 : -1);
+          pb._ly += pb._sinA * pushAmt * (dotB >= 0 ? 1 : -1);
           pa._lx = Math.max(LOGO_W/2+6, Math.min(W-LOGO_W/2-6, pa._lx));
           pa._ly = Math.max(LOGO_H/2+76, Math.min(H-LOGO_H/2-6, pa._ly));
           pb._lx = Math.max(LOGO_W/2+6, Math.min(W-LOGO_W/2-6, pb._lx));

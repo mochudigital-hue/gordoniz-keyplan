@@ -235,10 +235,44 @@ BRAND_DOMAINS = {
     # Electronica
     'huawei': 'huawei.com', 'xiaomi': 'xiaomi.es',
     'pc componentes': 'pccomponentes.com',
+    # Lujo relojeria / escritura
+    'montblanc': 'montblanc.com', 'mont blanc': 'montblanc.com',
+    'rolex': 'rolex.com', 'omega': 'omegawatches.com',
+    'longines': 'longines.com', 'tag heuer': 'tagheuer.com',
+    'iwc': 'iwc.com', 'breitling': 'breitling.com',
+    'bulgari': 'bulgari.com', 'bvlgari': 'bulgari.com',
+    # Moda lujo adicional
+    'bimba y lola': 'bimbaylola.com', 'bimba': 'bimbaylola.com',
+    'agatha': 'agatha.es', 'aristocrazy': 'aristocrazy.com',
+    'uterque': 'uterque.com', 'oysho': 'oysho.com',
+    'el ganso': 'elganso.com', 'pepe jeans': 'pepejeans.com',
+    'scotch soda': 'scotch-soda.com', 'hackett': 'hackett.com',
+    'boggi': 'boggi.com', 'corneliani': 'corneliani.com',
+    'brunello': 'brunellocucinelli.com', 'cucinelli': 'brunellocucinelli.com',
+    'loro piana': 'loropiana.com', 'kiton': 'kiton.it',
+    'ermenegildo zegna': 'zegna.com', 'zegna': 'zegna.com',
+    'acne': 'acnestudios.com', 'isabel marant': 'isabelmarant.com',
+    'sandro': 'sandro-paris.com', 'maje': 'maje.com',
+    'ba&sh': 'ba-sh.com', 'bash': 'ba-sh.com',
+    'claudie pierlot': 'claudiepierlot.com',
+    # Zapatos lujo
+    'manolo blahnik': 'manoloblahnik.com',
+    'christian louboutin': 'christianlouboutin.com', 'louboutin': 'christianlouboutin.com',
+    'jimmy choo': 'jimmychoo.com', 'aquazzura': 'aquazzura.com',
+    'stuart weitzman': 'stuartweitzman.com',
+    # Restaurantes zona Serrano
+    'ten con ten': 'tenconten.es',
+    'amazonia': 'restauranteamazonia.es',
+    'lateral': 'lateral.es',
+    # Optica zona
+    'optica serrano': 'opticaserrano.com',
+    # Joyeria
+    'carrera y carrera': 'carreraycarrera.com',
+    'rabat': 'rabat.es',
 }
 
 def logo_url(name):
-    """Logo via Google faviconV2 (alta calidad para marcas conocidas)."""
+    """Logo via Google faviconV2. Solo para marcas reconocidas en BRAND_DOMAINS."""
     name_lower = name.lower().strip()
     for brand, domain in BRAND_DOMAINS.items():
         if brand in name_lower:
@@ -247,15 +281,7 @@ def logo_url(name):
                 f"?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL"
                 f"&url=https://{domain}&size=128"
             )
-    # Adivina dominio para el resto
-    clean = re.sub(r"\s+(espana|spain|madrid|barcelona|es|sl|sa|slu)$", "", name_lower)
-    clean = re.sub(r"[^a-z0-9]", "", clean)
-    if len(clean) >= 4:
-        return (
-            f"https://t2.gstatic.com/faviconV2"
-            f"?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL"
-            f"&url=https://{clean}.com&size=128"
-        )
+    # Marcas desconocidas → texto limpio (sin favicon aleatorio)
     return ""
 
 
