@@ -212,7 +212,7 @@ function renderKeyPlan(data) {
   s.push('<svg width="'+W+'" height="'+H+'" xmlns="http://www.w3.org/2000/svg">');
   s.push('<rect width="'+W+'" height="'+H+'" fill="white"/>');
 
-  /* Compute meta for each street */
+  /* ── STREET META ─────────────────────────────────────────── */
   var metas = streets.map(function(st) {
     var n = st.places.length || 1;
     var cx = st.places.reduce(function(a,p){return a+p.px;},0)/n;
@@ -221,27 +221,39 @@ function renderKeyPlan(data) {
     return { name: st.name, places: st.places, cx: cx, cy: cy, ang: ang };
   });
 
-  /* 1. Draw street bands */
+  /* ── IDENTIFY TARGET STREET & FILTER PARALLELS ────────────
+     Keep: target street + streets whose angle differs ≥45° from it.
+     Parallel streets (angle diff <45°) show band+label but NO logos.
+  ─────────────────────────────────────────────────────────── */
+  var targetName = data.target_street || '';
+  var targetMeta = metas.find(function(m){ return m.name === targetName; })
+                || metas[0];
+  var targetAng  = targetMeta ? targetMeta.ang : 0;
+
+  function angDiff(a, b) {
+    var d = Math.abs(a - b) % Math.PI;
+    return d > Math.PI/2 ? Math.PI - d : d;
+  }
+
+  /* classify each street */
+  metas.forEach(function(m) {
+    var diff = angDiff(m.ang, targetAng);
+    /* "crossing" = perpendicular-ish (diff ≥ 40°) OR it IS the target street */
+    m.isCrossing = (diff >= 40 * Math.PI/180) || (m.name === targetMeta.name);
+  });
+
+  /* ── 1. DRAW ALL STREET BANDS ──────────────────────────── */
   metas.forEach(function(m) {
     var deg = (m.ang * 180 / Math.PI).toFixed(3);
     var bx  = (m.cx - diag/2).toFixed(1);
     var by  = (m.cy - BAND/2).toFixed(1);
-    /* Band */
     s.push('<rect x="'+bx+'" y="'+by+'" width="'+diag+'" height="'+BAND
       +'" fill="#6B6B6B"'
       +' transform="rotate('+deg+','+m.cx.toFixed(1)+','+m.cy.toFixed(1)+')"'
       +'/>');
-    /* Street label — placed at 30% of diag from center along the band */
-    var lx = (m.cx + diag * 0.28).toFixed(1);
-    var ly = m.cy.toFixed(1);
-    s.push('<text x="'+lx+'" y="'+ly+'"'
-      +' transform="rotate('+deg+','+m.cx.toFixed(1)+','+m.cy.toFixed(1)+')"'
-      +' text-anchor="middle" dominant-baseline="middle"'
-      +' fill="white" font-family="Arial,sans-serif" font-size="13"'
-      +' font-weight="900" letter-spacing="4">'+escH(m.name.toUpperCase())+'</text>');
   });
 
-  /* 2. Target property: red arrow + highlighted box ON the street */
+  /* ── 2. TARGET ARROW + BOX ─────────────────────────────── */
   var arrH = 30, arrW = 20;
   s.push('<polygon points="'
     +TX+','+(TY - BAND/2 - 2)+' '
@@ -252,107 +264,105 @@ function renderKeyPlan(data) {
     +'" width="76" height="'+(BAND-4)
     +'" rx="2" fill="rgba(255,230,150,0.85)" stroke="#E53935" stroke-width="3"/>');
 
-  /* 3. Place logos — max 3 per street-side, index-based slots, streets labels on top */
-  var LOGO_H   = 88;
-  var LOGO_W   = 154;
-  var LOGO_GAP = 16;
-  var SLOT_W   = LOGO_W + LOGO_GAP;  /* 170px per slot along street */
-  var LOGO_OFF = BAND/2 + 72;        /* perpendicular from band center to logo center */
-  var MAX_PER_SIDE = 3;
+  /* ── 3. LOGO PLACEMENT — crossing streets only ─────────── */
+  var LOGO_H     = 88;
+  var LOGO_W     = 150;
+  var LOGO_GAP   = 20;
+  var SLOT_W     = LOGO_W + LOGO_GAP;  /* 170 px per slot along street */
+  var LOGO_OFF   = BAND/2 + 80;        /* perp distance: band-center → logo-center */
+  var MAX_PER_SIDE = 2;                 /* max logos each side of each crossing street */
 
-  /* Collect street labels to redraw ON TOP of logos */
-  var streetLabels = [];
-  var allPlaced    = [];
+  var allPlaced = [];
 
   metas.forEach(function(m) {
+    if (!m.isCrossing) return;   /* skip parallel streets */
+
     var cosA = Math.cos(m.ang), sinA = Math.sin(m.ang);
-    var nx = -sinA, ny = cosA;
+    var nx = -sinA, ny = cosA;   /* perpendicular unit vector */
 
-    /* Save label info for later (draw on top) */
-    var lx = (m.cx + diag * 0.28);
-    var ly = m.cy;
-    streetLabels.push({ name: m.name, cx: m.cx, cy: m.cy, ang: m.ang, lx: lx, ly: ly });
-
-    /* Split into sides */
+    /* Split places into sides */
     var groups = { pos: [], neg: [] };
     m.places.forEach(function(p) {
       var relX = p.px - m.cx, relY = p.py - m.cy;
       var along = relX*cosA + relY*sinA;
       var perp  = relX*nx  + relY*ny;
-      var key   = (perp >= 0) ? 'pos' : 'neg';
-      groups[key].push({ p: p, along: along, hasLogo: !!p.logo });
+      groups[perp >= 0 ? 'pos' : 'neg'].push({ p:p, along:along, hasLogo:!!p.logo });
     });
 
-    ['pos', 'neg'].forEach(function(key) {
+    ['pos','neg'].forEach(function(key) {
       var grp = groups[key];
       if (!grp.length) return;
-      var sideSign = (key === 'pos') ? 1 : -1;
+      var sideSign = key === 'pos' ? 1 : -1;
 
-      /* Sort: known brands first, then by along position */
-      grp.sort(function(a, b) {
-        if (a.hasLogo !== b.hasLogo) return a.hasLogo ? -1 : 1;
-        return a.along - b.along;
-      });
-
-      /* Keep only MAX_PER_SIDE */
+      /* Known brands first, then by along */
+      grp.sort(function(a,b){ return a.hasLogo !== b.hasLogo ? (a.hasLogo?-1:1) : a.along-b.along; });
       grp = grp.slice(0, MAX_PER_SIDE);
+      grp.sort(function(a,b){ return a.along - b.along; });  /* restore geo order */
 
-      /* Re-sort kept items by along so they appear in geographic order */
-      grp.sort(function(a, b) { return a.along - b.along; });
-
-      /* Assign slot positions: center the group around the average along */
-      var n      = grp.length;
-      var avgAlong = grp.reduce(function(s, x) { return s + x.along; }, 0) / n;
-      /* Clamp center so group stays inside visible canvas */
-      var halfSpan = (n - 1) * SLOT_W / 2;
-      var minSafe  = -diag/2 + LOGO_W/2 + 8;
-      var maxSafe  =  diag/2 - LOGO_W/2 - 8;
-      avgAlong = Math.max(minSafe + halfSpan, Math.min(maxSafe - halfSpan, avgAlong));
+      /* Center slots near the visible mid-point of the street */
+      var n = grp.length;
+      var avgAlong = grp.reduce(function(s,x){return s+x.along;},0) / n;
+      /* Clamp so group stays inside canvas along this street */
+      var halfSpan = (n-1) * SLOT_W / 2;
+      var safe = diag/2 - LOGO_W/2 - 10;
+      avgAlong = Math.max(-safe+halfSpan, Math.min(safe-halfSpan, avgAlong));
 
       grp.forEach(function(item, idx) {
         var slotAlong = avgAlong + (idx - (n-1)/2) * SLOT_W;
-        var lx = m.cx + slotAlong * cosA + sideSign * LOGO_OFF * nx;
-        var ly = m.cy + slotAlong * sinA + sideSign * LOGO_OFF * ny;
-        lx = Math.max(LOGO_W/2 + 6, Math.min(W - LOGO_W/2 - 6, lx));
-        ly = Math.max(LOGO_H/2 + 76, Math.min(H - LOGO_H/2 - 6, ly));
-        item.p._lx = lx;
-        item.p._ly = ly;
+        var lx = m.cx + slotAlong*cosA + sideSign*LOGO_OFF*nx;
+        var ly = m.cy + slotAlong*sinA + sideSign*LOGO_OFF*ny;
+        lx = Math.max(LOGO_W/2+6, Math.min(W-LOGO_W/2-6, lx));
+        ly = Math.max(LOGO_H/2+76, Math.min(H-LOGO_H/2-6, ly));
+
+        /* Skip if overlaps any already-placed logo */
+        var overlap = allPlaced.some(function(q){
+          return Math.abs(lx-q._lx) < LOGO_W+4 && Math.abs(ly-q._ly) < LOGO_H+4;
+        });
+        if (overlap) return;
+
+        item.p._lx = lx; item.p._ly = ly;
         allPlaced.push(item.p);
       });
     });
   });
 
-  /* Render logos */
+  /* ── 3b. RENDER LOGOS ──────────────────────────────────── */
   allPlaced.forEach(function(p) {
     var lx = p._lx, ly = p._ly;
     if (p.logo) {
+      s.push('<rect x="'+(lx-LOGO_W/2-2).toFixed(0)+'" y="'+(ly-LOGO_H/2-2).toFixed(0)
+        +'" width="'+(LOGO_W+4)+'" height="'+(LOGO_H+4)
+        +'" rx="7" fill="white" stroke="#ddd" stroke-width="1.5"/>');
       s.push('<foreignObject x="'+(lx-LOGO_W/2).toFixed(0)+'" y="'+(ly-LOGO_H/2).toFixed(0)
         +'" width="'+LOGO_W+'" height="'+LOGO_H+'">');
       s.push('<div xmlns="http://www.w3.org/1999/xhtml"'
         +' style="width:'+LOGO_W+'px;height:'+LOGO_H+'px;display:flex;'
-        +'align-items:center;justify-content:center;overflow:hidden;background:white;border:1.5px solid #e0e0e0;border-radius:6px;">');
+        +'align-items:center;justify-content:center;overflow:hidden;">');
       s.push('<img src="'+escH(p.logo)+'" alt="'+escH(p.name)+'" title="'+escH(p.name)+'"'
-        +' style="max-height:'+(LOGO_H-12)+'px;max-width:'+(LOGO_W-12)+'px;object-fit:contain;"'
+        +' style="max-height:'+(LOGO_H-10)+'px;max-width:'+(LOGO_W-10)+'px;object-fit:contain;"'
         +' onerror="svgLogoErr(this)"/>');
       s.push('</div></foreignObject>');
     } else {
       var label = p.name.length > 20 ? p.name.slice(0,18)+'..' : p.name;
-      var lw = Math.min(label.length * 8 + 20, LOGO_W);
-      s.push('<rect x="'+(lx-lw/2).toFixed(0)+'" y="'+(ly-18).toFixed(0)+'" width="'+lw+'" height="34"'
-        +' rx="5" fill="white" stroke="#ccc" stroke-width="1.5"/>');
+      var lw = Math.min(label.length * 7.5 + 20, LOGO_W);
+      s.push('<rect x="'+(lx-lw/2).toFixed(0)+'" y="'+(ly-16).toFixed(0)
+        +'" width="'+lw+'" height="32" rx="5"'
+        +' fill="white" stroke="#bbb" stroke-width="1.5"/>');
       s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+5).toFixed(0)+'" text-anchor="middle"'
         +' fill="#333" font-family="Arial,sans-serif" font-size="11" font-weight="700">'+escH(label)+'</text>');
     }
   });
 
-  /* Redraw street labels ON TOP so logos never cover them */
-  streetLabels.forEach(function(sl) {
-    var deg = (sl.ang * 180 / Math.PI).toFixed(3);
-    s.push('<text x="'+sl.lx.toFixed(1)+'" y="'+sl.ly.toFixed(1)+'"'
-      +' transform="rotate('+deg+','+sl.cx.toFixed(1)+','+sl.cy.toFixed(1)+')"'
+  /* ── 4b. STREET LABELS — drawn last, always on top ─────── */
+  metas.forEach(function(m) {
+    var deg = (m.ang * 180 / Math.PI).toFixed(3);
+    var lx  = (m.cx + diag * 0.28).toFixed(1);
+    var ly  = m.cy.toFixed(1);
+    s.push('<text x="'+lx+'" y="'+ly+'"'
+      +' transform="rotate('+deg+','+m.cx.toFixed(1)+','+m.cy.toFixed(1)+')"'
       +' text-anchor="middle" dominant-baseline="middle"'
       +' fill="white" font-family="Arial,sans-serif" font-size="13"'
-      +' font-weight="900" letter-spacing="4">'+escH(sl.name.toUpperCase())+'</text>');
+      +' font-weight="900" letter-spacing="4">'+escH(m.name.toUpperCase())+'</text>');
   });
 
   /* 4. Header overlay */

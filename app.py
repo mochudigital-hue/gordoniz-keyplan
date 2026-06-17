@@ -366,8 +366,16 @@ def keyplan():
             "lng": p.get("geometry", {}).get("location", {}).get("lng"),
         })
 
-    max_streets = 6 if radius <= 300 else (12 if radius <= 800 else 20)
+    # Determinar calle objetivo (la calle del inmueble)
+    target_street = extract_street(formatted.split(",")[0])
+
+    # Ordenar calles por nº de negocios, limitar
+    max_streets = 8 if radius <= 300 else (14 if radius <= 800 else 20)
     streets_sorted = sorted(by_street.items(), key=lambda x: -len(x[1]))[:max_streets]
+
+    # Limitar a 6 negocios por calle (los más valorados)
+    def top_places(ps):
+        return sorted(ps, key=lambda p: -(p.get("rating") or 0))[:6]
 
     return jsonify({
         "formatted_address": formatted,
@@ -375,8 +383,9 @@ def keyplan():
         "lng": lng,
         "radius": radius,
         "total": len(places),
+        "target_street": target_street,
         "streets": [
-            {"name": s, "places": ps}
+            {"name": s, "places": top_places(ps)}
             for s, ps in streets_sorted
         ]
     })
