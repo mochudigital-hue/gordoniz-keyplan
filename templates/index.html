@@ -252,65 +252,108 @@ function renderKeyPlan(data) {
     +'" width="76" height="'+(BAND-4)
     +'" rx="2" fill="rgba(255,230,150,0.85)" stroke="#E53935" stroke-width="3"/>');
 
-  /* 3. Place logos perpendicular to their street */
-  var LOGO_OFF = BAND/2 + 62;   /* center-of-logo distance from band edge */
+  /* 3. Place logos — ordered & non-overlapping */
   var LOGO_H   = 90;
   var LOGO_W   = 160;
+  var LOGO_GAP = 12;   /* gap between logo boxes */
+  var LOGO_OFF = BAND/2 + 68;  /* perpendicular dist from band center to logo center */
+
+  /* Phase 1: assign each logo to a (street, side) group, sorted by along position */
+  var allPlaced = [];
 
   metas.forEach(function(m) {
     var cosA = Math.cos(m.ang), sinA = Math.sin(m.ang);
-    /* Perpendicular unit vector */
-    var nx = -sinA, ny = cosA;
+    var nx = -sinA, ny = cosA;  /* perpendicular unit vector */
 
-    m.places.forEach(function(p, i) {
-      /* Project place onto street line */
+    var groups = { pos: [], neg: [] };
+    m.places.forEach(function(p) {
       var relX = p.px - m.cx, relY = p.py - m.cy;
       var along = relX*cosA + relY*sinA;
       var perp  = relX*nx  + relY*ny;
+      var key   = (perp >= 0) ? 'pos' : 'neg';
+      groups[key].push({ p: p, along: along });
+    });
 
-      /* Determine side: use actual perpendicular sign, else alternate */
-      var side = (Math.abs(perp) > 8) ? (perp >= 0 ? 1 : -1) : (i%2===0 ? 1 : -1);
+    /* Phase 2: within each side, sort by along and enforce min spacing */
+    ['pos', 'neg'].forEach(function(key) {
+      var grp = groups[key];
+      if (!grp.length) return;
+      var sideSign = (key === 'pos') ? 1 : -1;
 
-      var lx = m.cx + along*cosA + side*LOGO_OFF*nx;
-      var ly = m.cy + along*sinA + side*LOGO_OFF*ny;
+      grp.sort(function(a, b) { return a.along - b.along; });
 
-      /* Keep within SVG bounds */
-      lx = Math.max(LOGO_W/2+6, Math.min(W - LOGO_W/2 - 6, lx));
-      ly = Math.max(LOGO_H/2+76, Math.min(H - LOGO_H/2 - 6, ly));
-      /* Spread logos that land too close together along the street */
-      var minAlong = (LOGO_W + 6);
-      for (var pi = 0; pi < i; pi++) {
-        var op = m.places[pi];
-        if (!op._lx) continue;
-        var ddx = lx - op._lx, ddy = ly - op._ly;
-        var dist = Math.sqrt(ddx*ddx + ddy*ddy);
-        if (dist < 40) {
-          lx += cosA * (40 - dist + 4) * (along >= 0 ? 1 : -1);
-          ly += sinA * (40 - dist + 4) * (along >= 0 ? 1 : -1);
+      /* Enforce minimum slot width between consecutive logos */
+      var slotW = LOGO_W + LOGO_GAP;
+      for (var i = 1; i < grp.length; i++) {
+        if (grp[i].along - grp[i-1].along < slotW) {
+          grp[i].along = grp[i-1].along + slotW;
         }
       }
-      p._lx = lx; p._ly = ly;
 
-      if (p.logo) {
-        /* foreignObject lets us use <img onerror> inside SVG */
-        s.push('<foreignObject x="'+(lx-LOGO_W/2).toFixed(0)+'" y="'+(ly-LOGO_H/2).toFixed(0)
-          +'" width="'+LOGO_W+'" height="'+LOGO_H+'">');
-        s.push('<div xmlns="http://www.w3.org/1999/xhtml"'
-          +' style="width:'+LOGO_W+'px;height:'+LOGO_H+'px;display:flex;'
-          +'align-items:center;justify-content:center;overflow:hidden;">');
-        s.push('<img src="'+escH(p.logo)+'" alt="'+escH(p.name)+'" title="'+escH(p.name)+'"'
-          +' style="max-height:'+LOGO_H+'px;max-width:'+LOGO_W+'px;object-fit:contain;"'
-          +' onerror="svgLogoErr(this)"/>');
-        s.push('</div></foreignObject>');
-      } else {
-        var label = p.name.length > 18 ? p.name.slice(0,16)+'..' : p.name;
-        var lw = Math.min(label.length * 9 + 16, 150);
-        s.push('<rect x="'+(lx-lw/2).toFixed(0)+'" y="'+(ly-18).toFixed(0)+'" width="'+lw+'" height="36"'
-          +' rx="4" fill="white" stroke="#bbb" stroke-width="1.5"/>');
-        s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+6).toFixed(0)+'" text-anchor="middle"'
-          +' fill="#222" font-family="Arial,sans-serif" font-size="11" font-weight="700">'+escH(label)+'</text>');
-      }
+      /* Compute pixel positions */
+      grp.forEach(function(item) {
+        var lx = m.cx + item.along * cosA + sideSign * LOGO_OFF * nx;
+        var ly = m.cy + item.along * sinA + sideSign * LOGO_OFF * ny;
+        lx = Math.max(LOGO_W/2 + 6, Math.min(W - LOGO_W/2 - 6, lx));
+        ly = Math.max(LOGO_H/2 + 76, Math.min(H - LOGO_H/2 - 6, ly));
+        item.p._lx = lx;
+        item.p._ly = ly;
+        allPlaced.push(item.p);
+      });
     });
+  });
+
+  /* Phase 3: global push-apart for cross-street overlaps (up to 15 iterations) */
+  for (var iter = 0; iter < 15; iter++) {
+    var moved = false;
+    for (var ai = 0; ai < allPlaced.length; ai++) {
+      for (var bi = ai + 1; bi < allPlaced.length; bi++) {
+        var pa = allPlaced[ai], pb = allPlaced[bi];
+        var dx = pb._lx - pa._lx, dy = pb._ly - pa._ly;
+        var ovX = (LOGO_W + LOGO_GAP) - Math.abs(dx);
+        var ovY = (LOGO_H + LOGO_GAP) - Math.abs(dy);
+        if (ovX > 0 && ovY > 0) {
+          /* Push along the axis with least overlap */
+          var pushX = 0, pushY = 0;
+          if (ovX <= ovY) {
+            pushX = (dx >= 0 ? 1 : -1) * (ovX / 2 + 1);
+          } else {
+            pushY = (dy >= 0 ? 1 : -1) * (ovY / 2 + 1);
+          }
+          pa._lx -= pushX; pa._ly -= pushY;
+          pb._lx += pushX; pb._ly += pushY;
+          pa._lx = Math.max(LOGO_W/2+6, Math.min(W-LOGO_W/2-6, pa._lx));
+          pa._ly = Math.max(LOGO_H/2+76, Math.min(H-LOGO_H/2-6, pa._ly));
+          pb._lx = Math.max(LOGO_W/2+6, Math.min(W-LOGO_W/2-6, pb._lx));
+          pb._ly = Math.max(LOGO_H/2+76, Math.min(H-LOGO_H/2-6, pb._ly));
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+
+  /* Phase 4: render all logos at their final positions */
+  allPlaced.forEach(function(p) {
+    var lx = p._lx, ly = p._ly;
+    if (p.logo) {
+      s.push('<foreignObject x="'+(lx-LOGO_W/2).toFixed(0)+'" y="'+(ly-LOGO_H/2).toFixed(0)
+        +'" width="'+LOGO_W+'" height="'+LOGO_H+'">');
+      s.push('<div xmlns="http://www.w3.org/1999/xhtml"'
+        +' style="width:'+LOGO_W+'px;height:'+LOGO_H+'px;display:flex;'
+        +'align-items:center;justify-content:center;overflow:hidden;">');
+      s.push('<img src="'+escH(p.logo)+'" alt="'+escH(p.name)+'" title="'+escH(p.name)+'"'
+        +' style="max-height:'+LOGO_H+'px;max-width:'+LOGO_W+'px;object-fit:contain;"'
+        +' onerror="svgLogoErr(this)"/>');
+      s.push('</div></foreignObject>');
+    } else {
+      var label = p.name.length > 18 ? p.name.slice(0,16)+'..' : p.name;
+      var lw = Math.min(label.length * 9 + 16, 150);
+      s.push('<rect x="'+(lx-lw/2).toFixed(0)+'" y="'+(ly-18).toFixed(0)+'" width="'+lw+'" height="36"'
+        +' rx="4" fill="white" stroke="#bbb" stroke-width="1.5"/>');
+      s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+6).toFixed(0)+'" text-anchor="middle"'
+        +' fill="#222" font-family="Arial,sans-serif" font-size="11" font-weight="700">'+escH(label)+'</text>');
+    }
   });
 
   /* 4. Header overlay */
