@@ -193,14 +193,14 @@ BRAND_DOMAINS = {
 }
 
 def logo_url(name):
-    """Obtiene favicon via Google."""
+    """Obtiene logo via Clearbit (alta calidad) con fallback a favicon."""
     name_lower = name.lower().strip()
     for brand, domain in BRAND_DOMAINS.items():
         if brand in name_lower:
-            return f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
+            return f"https://logo.clearbit.com/{domain}"
     clean = re.sub(r'\s+(espana|spain|madrid|barcelona|es|sl|sa|slu|sll)$', '', name_lower)
     clean = re.sub(r'[^a-z0-9]', '', clean)
-    return f"https://www.google.com/s2/favicons?domain={clean}.com&sz=64"
+    return f"https://logo.clearbit.com/{clean}.com"
 
 
 @app.route("/api/config")
