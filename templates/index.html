@@ -10,7 +10,6 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #222; }
 
-  /* ── HEADER ── */
   .header {
     background: #1A3C5E;
     color: white;
@@ -23,7 +22,6 @@
   .header h1 { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
   .header span { font-size: 12px; color: #E8A020; font-weight: 600; letter-spacing: 2px; }
 
-  /* ── FORM PANEL ── */
   .panel {
     background: white;
     padding: 24px 32px;
@@ -69,7 +67,6 @@
   }
   .btn-export:hover { background: #152f4a; }
 
-  /* ── ESTADO ── */
   .status {
     text-align: center;
     padding: 20px;
@@ -90,7 +87,6 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── KEY PLAN CANVAS ── */
   #keyplan-container {
     padding: 32px;
     display: none;
@@ -106,7 +102,6 @@
     min-height: 500px;
   }
 
-  /* Logo Gordoniz */
   .kp-logo {
     position: absolute;
     top: 24px;
@@ -131,7 +126,6 @@
   }
   .kp-logo-sub span { color: #E8A020; }
 
-  /* Título KEY PLAN */
   .kp-title {
     text-align: center;
     margin-bottom: 28px;
@@ -157,7 +151,6 @@
     font-weight: 400;
   }
 
-  /* ── CALLES ── */
   .streets-wrapper {
     display: flex;
     flex-direction: column;
@@ -171,7 +164,6 @@
     margin-bottom: 8px;
   }
 
-  /* Logos arriba de la calle */
   .places-row {
     display: flex;
     flex-wrap: wrap;
@@ -185,7 +177,6 @@
     padding: 6px 8px 10px;
   }
 
-  /* Banda de calle */
   .street-band {
     background: #6B6B6B;
     color: white;
@@ -199,7 +190,6 @@
     border-radius: 2px;
   }
 
-  /* Chip de negocio */
   .place-chip {
     display: flex;
     flex-direction: column;
@@ -246,7 +236,6 @@
     line-height: 1.2;
   }
 
-  /* Local objetivo */
   .place-chip.target .place-logo-wrap {
     border: 2.5px solid #E53935;
     box-shadow: 0 0 0 1px rgba(229,57,53,0.3);
@@ -260,7 +249,6 @@
     margin-bottom: -2px;
   }
 
-  /* Tooltip */
   .place-tooltip {
     display: none;
     position: absolute;
@@ -292,7 +280,6 @@
   .tooltip-rating { margin-top: 2px; }
   .star { color: #E8A020; }
 
-  /* ── LEYENDA ── */
   .legend {
     display: flex;
     flex-wrap: wrap;
@@ -314,7 +301,6 @@
     flex-shrink: 0;
   }
 
-  /* ── STATS BAR ── */
   .stats-bar {
     display: flex;
     gap: 24px;
@@ -327,7 +313,6 @@
   .stat-num { font-size: 22px; font-weight: 800; color: #1A3C5E; }
   .stat-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
 
-  /* ── RESUMEN CATEGORÍAS ── */
   .cat-summary {
     display: flex;
     flex-wrap: wrap;
@@ -365,8 +350,8 @@
 
 <div class="panel">
   <div class="field field-address">
-    <label>Dirección del local</label>
-    <input type="text" id="address" placeholder="Ej: Calle Alcalá 1, Madrid" value="">
+    <label>Direcci&#243;n del local</label>
+    <input type="text" id="address" placeholder="Ej: Calle Alcal&#225; 1, Madrid" value="">
   </div>
   <div class="field field-radio">
     <label>Radio (m)</label>
@@ -376,9 +361,9 @@
     <label>Google API Key</label>
     <input type="password" id="apikey" placeholder="AIza...">
   </div>
-  <button class="btn" id="btn-generate" onclick="generate()">▶ Generar Key Plan</button>
-  <button class="btn btn-export" id="btn-export" onclick="window.print()">⬇ Exportar / Imprimir</button>
-  <button class="btn btn-map" id="btn-map" onclick="toggleMap()" style="display:none;background:#2E7D32;">🗺 Ver Mapa</button>
+  <button class="btn" id="btn-generate" onclick="generate()">&#9658; Generar Key Plan</button>
+  <button class="btn btn-export" id="btn-export" onclick="window.print()">&#8595; Exportar / Imprimir</button>
+  <button class="btn" id="btn-map" onclick="toggleMap()" style="display:none;background:#2E7D32;">Ver Mapa</button>
 </div>
 
 <div class="status" id="status">
@@ -387,24 +372,22 @@
 
 <div id="keyplan-container">
   <div class="keyplan" id="keyplan">
-    <!-- Se genera dinámicamente -->
   </div>
 </div>
 
-<!-- MAPA INTERACTIVO -->
 <div id="map-container" style="display:none; padding: 16px 32px;">
   <div id="map" style="height:600px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.15); border:2px solid #e0e0e0;"></div>
 </div>
 
 <script>
 const LEGEND_CATS = {
-  "Restauración": "#E53935",
+  "Restauracion": "#E53935",
   "Comercio":     "#43A047",
   "Banca":        "#1E88E5",
   "Salud":        "#8E24AA",
   "Alojamiento":  "#FB8C00",
   "Transporte":   "#757575",
-  "Educación":    "#00ACC1",
+  "Educacion":    "#00ACC1",
   "Ocio":         "#F4511E",
   "Otros":        "#546E7A",
 };
@@ -412,7 +395,6 @@ const LEGEND_CATS = {
 let lastData = null;
 let serverHasKey = false;
 
-// Al cargar la página: comprobar si el servidor tiene key, y cargar la guardada
 (async () => {
   try {
     const cfg = await fetch('/api/config').then(r => r.json());
@@ -432,22 +414,21 @@ async function generate() {
   const apikey  = document.getElementById('apikey').value.trim();
 
   if (!address || (!apikey && !serverHasKey)) {
-    alert('Introduce la dirección y la API Key.');
+    alert('Introduce la direccion y la API Key.');
     return;
   }
 
-  // Guardar la key en localStorage para no tener que introducirla la próxima vez
   if (apikey) localStorage.setItem('gordoniz_api_key', apikey);
 
   const btn = document.getElementById('btn-generate');
   btn.disabled = true;
-  btn.textContent = '⏳ Cargando...';
+  btn.textContent = 'Cargando...';
 
   document.getElementById('status').classList.add('visible');
   document.getElementById('keyplan-container').classList.remove('visible');
   document.getElementById('btn-export').style.display = 'none';
 
-  setStatus('Geocodificando dirección...');
+  setStatus('Geocodificando direccion...');
 
   try {
     const resp = await fetch('/api/keyplan', {
@@ -462,17 +443,17 @@ async function generate() {
       throw new Error(data.error || 'Error desconocido');
     }
 
-    setStatus(`Encontrados ${data.total} negocios. Generando Key Plan...`);
+    setStatus('Encontrados ' + data.total + ' negocios. Generando Key Plan...');
     await sleep(300);
 
     lastData = data;
     renderKeyPlan(data);
 
   } catch (e) {
-    setStatus('❌ Error: ' + e.message);
+    setStatus('Error: ' + e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = '▶ Generar Key Plan';
+    btn.textContent = 'Generar Key Plan';
   }
 }
 
@@ -485,115 +466,229 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function stars(rating) {
   if (!rating) return '';
   const full = Math.floor(rating);
-  const half = rating - full >= 0.5 ? '½' : '';
-  return '★'.repeat(full) + half + ` ${rating.toFixed(1)}`;
+  const half = rating - full >= 0.5 ? '1/2' : '';
+  return '*'.repeat(full) + half + ' ' + rating.toFixed(1);
 }
 
 function renderKeyPlan(data) {
   const container = document.getElementById('keyplan');
 
-  // Extraer ciudad y calle del formatted_address
   const parts = data.formatted_address.split(',');
-  const streetPart = parts[0]?.trim() || data.formatted_address;
+  const streetPart = parts[0] ? parts[0].trim() : data.formatted_address;
   const cityPart   = parts.slice(-2).join(',').trim();
 
-  // Contar categorías
   const catCount = {};
-  data.streets.forEach(s => s.places.forEach(p => {
-    catCount[p.category] = (catCount[p.category] || 0) + 1;
-  }));
+  data.streets.forEach(function(s) {
+    s.places.forEach(function(p) {
+      catCount[p.category] = (catCount[p.category] || 0) + 1;
+    });
+  });
 
-  let html = `
-    <!-- Logo -->
-    <div class="kp-logo">
-      <div class="kp-logo-icon">G</div>
-      <div style="font-size:10px;font-weight:800;color:#1A3C5E;letter-spacing:1px;">GORDONIZ</div>
-      <div class="kp-logo-sub">SERVICIOS <span>INMOBILIARIOS</span></div>
-    </div>
+  let html = '<div class="kp-logo"><div class="kp-logo-icon">G</div>';
+  html += '<div style="font-size:10px;font-weight:800;color:#1A3C5E;letter-spacing:1px;">GORDONIZ</div>';
+  html += '<div class="kp-logo-sub">SERVICIOS <span>INMOBILIARIOS</span></div></div>';
 
-    <!-- Título -->
-    <div class="kp-title">
-      <h2>KEY PLAN</h2>
-      <p>${streetPart.toUpperCase()}</p>
-      <p style="font-weight:400;font-size:12px;">${cityPart.toUpperCase()}</p>
-      <div class="kp-meta">Radio ${data.radius}m · ${data.total} negocios encontrados</div>
-    </div>
+  html += '<div class="kp-title"><h2>KEY PLAN</h2>';
+  html += '<p>' + streetPart.toUpperCase() + '</p>';
+  html += '<p style="font-weight:400;font-size:12px;">' + cityPart.toUpperCase() + '</p>';
+  html += '<div class="kp-meta">Radio ' + data.radius + 'm &middot; ' + data.total + ' negocios encontrados</div></div>';
 
-    <!-- Calles -->
-    <div class="streets-wrapper">
-  `;
+  html += '<div class="streets-wrapper">';
 
-  data.streets.forEach((street, si) => {
-    // Dividir en dos grupos: arriba y abajo de la calle
-    const half = Math.ceil(street.places.length / 2);
+  data.streets.forEach(function(street) {
+    const half   = Math.ceil(street.places.length / 2);
     const top    = street.places.slice(0, half);
     const bottom = street.places.slice(half);
 
-    html += `<div class="street-block">`;
-
-    // Fila superior
-    html += `<div class="places-row">`;
-    top.forEach(p => { html += placeChip(p); });
-    html += `</div>`;
-
-    // Banda de calle
-    html += `<div class="street-band">${street.name.toUpperCase()}</div>`;
-
-    // Fila inferior
-    html += `<div class="places-row bottom">`;
-    bottom.forEach(p => { html += placeChip(p); });
-    html += `</div>`;
-
-    html += `</div>`;
+    html += '<div class="street-block">';
+    html += '<div class="places-row">';
+    top.forEach(function(p) { html += placeChip(p); });
+    html += '</div>';
+    html += '<div class="street-band">' + street.name.toUpperCase() + '</div>';
+    html += '<div class="places-row bottom">';
+    bottom.forEach(function(p) { html += placeChip(p); });
+    html += '</div>';
+    html += '</div>';
   });
 
-  html += `</div>`; // streets-wrapper
+  html += '</div>';
 
-  // Stats
-  html += `<div class="stats-bar">
-    <div class="stat"><div class="stat-num">${data.total}</div><div class="stat-label">Negocios</div></div>
-    <div class="stat"><div class="stat-num">${data.streets.length}</div><div class="stat-label">Calles</div></div>
-    <div class="stat"><div class="stat-num">${data.radius}m</div><div class="stat-label">Radio</div></div>
-    <div class="stat"><div class="stat-num">${Object.keys(catCount).length}</div><div class="stat-label">Categorías</div></div>
-  </div>`;
+  html += '<div class="stats-bar">';
+  html += '<div class="stat"><div class="stat-num">' + data.total + '</div><div class="stat-label">Negocios</div></div>';
+  html += '<div class="stat"><div class="stat-num">' + data.streets.length + '</div><div class="stat-label">Calles</div></div>';
+  html += '<div class="stat"><div class="stat-num">' + data.radius + 'm</div><div class="stat-label">Radio</div></div>';
+  html += '<div class="stat"><div class="stat-num">' + Object.keys(catCount).length + '</div><div class="stat-label">Categorias</div></div>';
+  html += '</div>';
 
-  // Categorías badge
-  html += `<div class="cat-summary">`;
-  Object.entries(catCount).sort((a,b)=>b[1]-a[1]).forEach(([cat, n]) => {
-    const color = LEGEND_CATS[cat] || '#546E7A';
-    html += `<span class="cat-badge" style="background:${color}">${cat} (${n})</span>`;
+  html += '<div class="cat-summary">';
+  Object.entries(catCount).sort(function(a,b){ return b[1]-a[1]; }).forEach(function(entry) {
+    var cat = entry[0], n = entry[1];
+    var color = LEGEND_CATS[cat] || '#546E7A';
+    html += '<span class="cat-badge" style="background:' + color + '">' + cat + ' (' + n + ')</span>';
   });
-  html += `</div>`;
+  html += '</div>';
 
-  // Leyenda
-  html += `<div class="legend">`;
-  Object.entries(LEGEND_CATS).forEach(([cat, color]) => {
-    html += `<div class="legend-item"><div class="legend-dot" style="background:${color}"></div>${cat}</div>`;
+  html += '<div class="legend">';
+  Object.entries(LEGEND_CATS).forEach(function(entry) {
+    var cat = entry[0], color = entry[1];
+    html += '<div class="legend-item"><div class="legend-dot" style="background:' + color + '"></div>' + cat + '</div>';
   });
-  html += `</div>`;
+  html += '</div>';
 
   container.innerHTML = html;
 
-  // Manejar errores de logo (mostrar fallback)
-  container.querySelectorAll('.place-logo-wrap img').forEach(img => {
+  container.querySelectorAll('.place-logo-wrap img').forEach(function(img) {
     img.onerror = function() {
-      const wrap = this.closest('.place-logo-wrap');
-      const color = wrap.dataset.color || '#546E7A';
-      const name  = wrap.dataset.name || '';
-      wrap.innerHTML = `<div class="fallback-text" style="background:${color}"></div>`;
-          // Mostrar nombre completo debajo del chip
-          const chip = wrap.closest('.place-chip');
-          if (chip && !chip.querySelector('.place-name')) {
-            const nameDiv = document.createElement('div');
-            nameDiv.className = 'place-name';
-            nameDiv.textContent = name;
-            nameDiv.title = name;
-            chip.appendChild(nameDiv);
-          }
+      var wrap = this.closest('.place-logo-wrap');
+      var color = wrap.dataset.color || '#546E7A';
+      var name  = wrap.dataset.name || '';
+      wrap.innerHTML = '<div class="fallback-text" style="background:' + color + '"></div>';
+      var chip = wrap.closest('.place-chip');
+      if (chip && !chip.querySelector('.place-name')) {
+        var nameDiv = document.createElement('div');
+        nameDiv.className = 'place-name';
+        nameDiv.textContent = name;
+        nameDiv.title = name;
+        chip.appendChild(nameDiv);
+      }
     };
   });
 
   document.getElementById('status').classList.remove('visible');
   document.getElementById('keyplan-container').classList.add('visible');
   document.getElementById('btn-export').style.display = 'inline-block';
-  document.getElementById('btn-map').style.display = '
+  document.getElementById('btn-map').style.display = 'inline-block';
+  document.getElementById('map-container').style.display = 'none';
+  document.getElementById('btn-map').textContent = 'Ver Mapa';
+  if (window._leafletMap) {
+    window._leafletMap.remove();
+    window._leafletMap = null;
+  }
+}
+
+function placeChip(p) {
+  var ratingStr = p.rating ? '<div class="tooltip-rating"><span class="star">*</span> ' + p.rating.toFixed(1) + ' (' + p.reviews + ')</div>' : '';
+  var openStr = p.open === true ? '<div style="color:#4CAF50;margin-top:2px;">Abierto</div>'
+              : p.open === false ? '<div style="color:#f44336;margin-top:2px;">Cerrado</div>' : '';
+
+  return '<div class="place-chip">'
+    + '<div class="place-logo-wrap" data-color="' + p.color + '" data-name="' + escHtml(p.name) + '">'
+    + '<img src="' + p.logo + '" alt="' + escHtml(p.name) + '" loading="lazy">'
+    + '</div>'
+    + '<div class="place-name" title="' + escHtml(p.name) + '">' + escHtml(p.name) + '</div>'
+    + '<div class="place-tooltip">'
+    + '<div class="tooltip-name">' + escHtml(p.name) + '</div>'
+    + '<div class="tooltip-cat">' + p.category + '</div>'
+    + ratingStr + openStr
+    + '</div>'
+    + '</div>';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleMap() {
+  var mapDiv = document.getElementById('map-container');
+  var btn = document.getElementById('btn-map');
+  if (mapDiv.style.display === 'none') {
+    mapDiv.style.display = 'block';
+    btn.textContent = 'Cerrar Mapa';
+    initMap(lastData);
+  } else {
+    mapDiv.style.display = 'none';
+    btn.textContent = 'Ver Mapa';
+    if (window._leafletMap) {
+      window._leafletMap.remove();
+      window._leafletMap = null;
+    }
+  }
+}
+
+function initMap(data) {
+  if (!data) return;
+  if (window._leafletMap) {
+    window._leafletMap.remove();
+    window._leafletMap = null;
+  }
+
+  var map = L.map('map', { zoomControl: true }).setView([data.lat, data.lng], 18);
+  window._leafletMap = map;
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    subdomains: 'abcd',
+    maxZoom: 21
+  }).addTo(map);
+
+  L.circle([data.lat, data.lng], {
+    radius: data.radius,
+    color: '#1A3C5E',
+    fillColor: '#1A3C5E',
+    fillOpacity: 0.06,
+    weight: 2,
+    dashArray: '8,5'
+  }).addTo(map);
+
+  var pinHtml = '<div style="display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.4));">'
+    + '<div style="background:#E8A020;color:white;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:800;white-space:nowrap;border:2px solid white;">LOCAL</div>'
+    + '<div style="width:2px;height:10px;background:#E8A020;"></div></div>';
+
+  L.marker([data.lat, data.lng], {
+    icon: L.divIcon({ className:'', html: pinHtml, iconAnchor:[30,0] }),
+    zIndexOffset: 1000
+  }).addTo(map).bindPopup('<b style="font-size:13px">Local buscado</b><br><span style="color:#666">' + data.formatted_address + '</span>');
+
+  data.streets.forEach(function(street) {
+    street.places.forEach(function(p) {
+      if (!p.lat || !p.lng) return;
+
+      var displayName = p.name.length > 22 ? p.name.slice(0, 21) + '...' : p.name;
+      var initial = p.name.charAt(0).toUpperCase();
+      var markerId = 'mk_' + Math.random().toString(36).slice(2);
+
+      var labelHtml = '<div style="display:inline-flex;align-items:center;gap:7px;background:white;border:2.5px solid ' + p.color + ';padding:4px 10px 4px 4px;border-radius:24px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 12px rgba(0,0,0,0.22);cursor:pointer;font-family:Arial,sans-serif;line-height:1;color:#222;">'
+        + '<div id="' + markerId + '" style="width:28px;height:28px;border-radius:50%;background:' + p.color + ';flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:13px;font-weight:800;color:white;">' + initial + '</div>'
+        + '<span>' + displayName + '</span></div>';
+
+      var ratingHtml = p.rating ? '<div style="margin-top:4px;font-size:11px;color:#555">* ' + p.rating.toFixed(1) + ' (' + p.reviews + ' resenas)</div>' : '';
+      var openHtml = p.open === true
+        ? '<div style="margin-top:3px;font-size:11px;color:#4CAF50;font-weight:600">Abierto ahora</div>'
+        : p.open === false
+        ? '<div style="margin-top:3px;font-size:11px;color:#f44336;font-weight:600">Cerrado</div>' : '';
+
+      var mkr = L.marker([p.lat, p.lng], {
+        icon: L.divIcon({ className:'', html: labelHtml, iconAnchor:[0,14] })
+      }).addTo(map);
+
+      var logoImg = new Image();
+      logoImg.onload = function() {
+        if (logoImg.naturalWidth <= 16) return;
+        var el = document.getElementById(markerId);
+        if (el) {
+          el.innerHTML = '';
+          el.style.background = 'white';
+          el.style.padding = '2px';
+          var img = document.createElement('img');
+          img.src = p.logo;
+          img.style.cssText = 'width:24px;height:24px;object-fit:contain;border-radius:4px;';
+          el.appendChild(img);
+        }
+      };
+      logoImg.src = p.logo;
+
+      mkr.bindPopup('<div style="min-width:180px;padding:2px">'
+        + '<div style="display:inline-block;background:' + p.color + ';color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-bottom:6px;">' + p.category + '</div>'
+        + '<div style="font-weight:700;font-size:14px;margin-bottom:2px;color:#222">' + p.name + '</div>'
+        + '<div style="font-size:11px;color:#777">' + p.vicinity + '</div>'
+        + ratingHtml + openHtml + '</div>', { maxWidth: 220 });
+    });
+  });
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') generate();
+});
+</script>
+</body>
+</html>
