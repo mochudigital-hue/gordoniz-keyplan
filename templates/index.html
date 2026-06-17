@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Key Plan — Gordoniz Servicios Inmobiliarios</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #222; }
+
+  /* ── HEADER ── */
+  .header {
+    background: #1A3C5E;
+    color: white;
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+  .header span { font-size: 12px; color: #E8A020; font-weight: 600; letter-spacing: 2px; }
+
+  /* ── FORM PANEL ── */
+  .panel {
+    background: white;
+    padding: 24px 32px;
+    border-bottom: 3px solid #E8A020;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+  .field input {
+    border: 1.5px solid #ccc;
+    border-radius: 6px;
+    padding: 9px 14px;
+    font-size: 14px;
+    outline: none;
+    transition: border 0.2s;
+    background: #fafafa;
+  }
+  .field input:focus { border-color: #1A3C5E; background: white; }
+  .field-address input { width: 360px; }
+  .field-key input { width: 280px; font-family: monospace; font-size: 12px; }
+  .field-radio input { width: 100px; }
+  .btn {
+    background: #E8A020;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 28px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+    height: 40px;
+  }
+  .btn:hover { background: #cf8c18; }
+  .btn:disabled { background: #ccc; cursor: not-allowed; }
+  .btn-export {
+    background: #1A3C5E;
+    margin-left: auto;
+    display: none;
+  }
+  .btn-export:hover { background: #152f4a; }
+
+  /* ── ESTADO ── */
+  .status {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-size: 14px;
+    display: none;
+  }
+  .status.visible { display: block; }
+  .spinner {
+    display: inline-block;
+    width: 20px; height: 20px;
+    border: 3px solid #ddd;
+    border-top-color: #E8A020;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── KEY PLAN CANVAS ── */
+  #keyplan-container {
+    padding: 32px;
+    display: none;
+  }
+  #keyplan-container.visible { display: block; }
+
+  .keyplan {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    padding: 32px 36px 24px;
+    position: relative;
+    min-height: 500px;
+  }
+
+  /* Logo Gordoniz */
+  .kp-logo {
+    position: absolute;
+    top: 24px;
+    left: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .kp-logo-icon {
+    font-size: 28px;
+    font-weight: 900;
+    color: #1A3C5E;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .kp-logo-sub {
+    font-size: 8px;
+    color: #1A3C5E;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .kp-logo-sub span { color: #E8A020; }
+
+  /* Título KEY PLAN */
+  .kp-title {
+    text-align: center;
+    margin-bottom: 28px;
+    padding-top: 4px;
+  }
+  .kp-title h2 {
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: underline;
+    color: #1A3C5E;
+    letter-spacing: 2px;
+    margin-bottom: 2px;
+  }
+  .kp-title p {
+    font-size: 13px;
+    color: #333;
+    font-weight: 600;
+  }
+  .kp-meta {
+    font-size: 10px;
+    color: #999;
+    margin-top: 4px;
+    font-weight: 400;
+  }
+
+  /* ── CALLES ── */
+  .streets-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 16px;
+  }
+
+  .street-block {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 8px;
+  }
+
+  /* Logos arriba de la calle */
+  .places-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 8px 6px;
+    min-height: 56px;
+    align-items: flex-end;
+  }
+  .places-row.bottom {
+    align-items: flex-start;
+    padding: 6px 8px 10px;
+  }
+
+  /* Banda de calle */
+  .street-band {
+    background: #6B6B6B;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 7px 20px;
+    display: flex;
+    align-items: center;
+    border-radius: 2px;
+  }
+
+  /* Chip de negocio */
+  .place-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.15s;
+    position: relative;
+    width: 72px;
+  }
+  .place-chip:hover { transform: translateY(-2px); }
+  .place-chip:hover .place-tooltip { display: block; }
+
+  .place-logo-wrap {
+    width: 64px;
+    height: 36px;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #e0e0e0;
+    background: white;
+    position: relative;
+  }
+  .place-logo-wrap img {
+    max-width: 58px;
+    max-height: 32px;
+    object-fit: contain;
+  }
+  .place-logo-wrap .fallback-text {
+    width: 100%;
+    height: 100%;
+  }
+  .place-name {
+    font-size: 8px;
+    text-align: center;
+    color: #333;
+    margin-top: 3px;
+    width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  /* Local objetivo */
+  .place-chip.target .place-logo-wrap {
+    border: 2.5px solid #E53935;
+    box-shadow: 0 0 0 1px rgba(229,57,53,0.3);
+    background: #FFF9C4;
+  }
+  .target-arrow {
+    font-size: 20px;
+    color: #E53935;
+    text-align: center;
+    display: block;
+    margin-bottom: -2px;
+  }
+
+  /* Tooltip */
+  .place-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1A3C5E;
+    color: white;
+    font-size: 10px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    min-width: 140px;
+    text-align: center;
+  }
+  .place-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1A3C5E;
+  }
+  .tooltip-name { font-weight: 700; font-size: 11px; }
+  .tooltip-cat { color: #E8A020; font-size: 9px; margin-top: 2px; }
+  .tooltip-rating { margin-top: 2px; }
+  .star { color: #E8A020; }
+
+  /* ── LEYENDA ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #eee;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: #555;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+    margin-top: 12px;
+    padding: 12px 0;
+    border-top: 1px solid #eee;
+    flex-wrap: wrap;
+  }
+  .stat { text-align: center; }
+  .stat-num { font-size: 22px; font-weight: 800; color: #1A3C5E; }
+  .stat-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* ── RESUMEN CATEGORÍAS ── */
+  .cat-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .cat-badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    color: white;
+  }
+
+  @media print {
+    body { background: white; }
+    .panel, .header, .btn-export, .status { display: none !important; }
+    #keyplan-container { padding: 0; display: block !important; }
+    .keyplan { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div style="font-size:22px;font-weight:900;letter-spacing:-1px;">G</div>
+  </div>
+  <div>
+    <h1>GORDONIZ</h1>
+    <span>SERVICIOS INMOBILIARIOS</span>
+  </div>
+  <div style="margin-left:auto;font-size:13px;color:#aaa;">Key Plan Generator</div>
+</div>
+
+<div class="panel">
+  <div class="field field-address">
+    <label>Dirección del local</label>
+    <input type="text" id="address" placeholder="Ej: Calle Alcalá 1, Madrid" value="">
+  </div>
+  <div class="field field-radio">
+    <label>Radio (m)</label>
+    <input type="number" id="radius" value="200" min="50" max="1000" step="50">
+  </div>
+  <div class="field field-key" id="apikey-group">
+    <label>Google API Key</label>
+    <input type="password" id="apikey" placeholder="AIza...">
+  </div>
+  <button class="btn" id="btn-generate" onclick="generate()">▶ Generar Key Plan</button>
+  <button class="btn btn-export" id="btn-export" onclick="window.print()">⬇ Exportar / Imprimir</button>
+  <button class="btn btn-map" id="btn-map" onclick="toggleMap()" style="display:none;background:#2E7D32;">🗺 Ver Mapa</button>
+</div>
+
+<div class="status" id="status">
+  <span class="spinner"></span> <span id="status-text">Buscando negocios...</span>
+</div>
+
+<div id="keyplan-container">
+  <div class="keyplan" id="keyplan">
+    <!-- Se genera dinámicamente -->
+  </div>
+</div>
+
+<!-- MAPA INTERACTIVO -->
+<div id="map-container" style="display:none; padding: 16px 32px;">
+  <div id="map" style="height:600px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.15); border:2px solid #e0e0e0;"></div>
+</div>
+
+<script>
+const LEGEND_CATS = {
+  "Restauración": "#E53935",
+  "Comercio":     "#43A047",
+  "Banca":        "#1E88E5",
+  "Salud":        "#8E24AA",
+  "Alojamiento":  "#FB8C00",
+  "Transporte":   "#757575",
+  "Educación":    "#00ACC1",
+  "Ocio":         "#F4511E",
+  "Otros":        "#546E7A",
+};
+
+let lastData = null;
+let serverHasKey = false;
+
+// Al cargar la página: comprobar si el servidor tiene key, y cargar la guardada
+(async () => {
+  try {
+    const cfg = await fetch('/api/config').then(r => r.json());
+    serverHasKey = cfg.has_server_key;
+    if (serverHasKey) {
+      document.getElementById('apikey-group').style.display = 'none';
+    } else {
+      const saved = localStorage.getItem('gordoniz_api_key');
+      if (saved) document.getElementById('apikey').value = saved;
+    }
+  } catch(e) {}
+})();
+
+async function generate() {
+  const address = document.getElementById('address').value.trim();
+  const radius  = parseInt(document.getElementById('radius').value) || 200;
+  const apikey  = document.getElementById('apikey').value.trim();
+
+  if (!address || (!apikey && !serverHasKey)) {
+    alert('Introduce la dirección y la API Key.');
+    return;
+  }
+
+  // Guardar la key en localStorage para no tener que introducirla la próxima vez
+  if (apikey) localStorage.setItem('gordoniz_api_key', apikey);
+
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = true;
+  btn.textContent = '⏳ Cargando...';
+
+  document.getElementById('status').classList.add('visible');
+  document.getElementById('keyplan-container').classList.remove('visible');
+  document.getElementById('btn-export').style.display = 'none';
+
+  setStatus('Geocodificando dirección...');
+
+  try {
+    const resp = await fetch('/api/keyplan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ address, radius, api_key: apikey })
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      throw new Error(data.error || 'Error desconocido');
+    }
+
+    setStatus(`Encontrados ${data.total} negocios. Generando Key Plan...`);
+    await sleep(300);
+
+    lastData = data;
+    renderKeyPlan(data);
+
+  } catch (e) {
+    setStatus('❌ Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Generar Key Plan';
+  }
+}
+
+function setStatus(msg) {
+  document.getElementById('status-text').textContent = msg;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function stars(rating) {
+  if (!rating) return '';
+  const full = Math.floor(rating);
+  const half = rating - full >= 0.5 ? '½' : '';
+  return '★'.repeat(full) + half + ` ${rating.toFixed(1)}`;
+}
+
+function renderKeyPlan(data) {
+  const container = document.getElementById('keyplan');
+
+  // Extraer ciudad y calle del formatted_address
+  const parts = data.formatted_address.split(',');
+  const streetPart = parts[0]?.trim() || data.formatted_address;
+  const cityPart   = parts.slice(-2).join(',').trim();
+
+  // Contar categorías
+  const catCount = {};
+  data.streets.forEach(s => s.places.forEach(p => {
+    catCount[p.category] = (catCount[p.category] || 0) + 1;
+  }));
+
+  let html = `
+    <!-- Logo -->
+    <div class="kp-logo">
+      <div class="kp-logo-icon">G</div>
+      <div style="font-size:10px;font-weight:800;color:#1A3C5E;letter-spacing:1px;">GORDONIZ</div>
+      <div class="kp-logo-sub">SERVICIOS <span>INMOBILIARIOS</span></div>
+    </div>
+
+    <!-- Título -->
+    <div class="kp-title">
+      <h2>KEY PLAN</h2>
+      <p>${streetPart.toUpperCase()}</p>
+      <p style="font-weight:400;font-size:12px;">${cityPart.toUpperCase()}</p>
+      <div class="kp-meta">Radio ${data.radius}m · ${data.total} negocios encontrados</div>
+    </div>
+
+    <!-- Calles -->
+    <div class="streets-wrapper">
+  `;
+
+  data.streets.forEach((street, si) => {
+    // Dividir en dos grupos: arriba y abajo de la calle
+    const half = Math.ceil(street.places.length / 2);
+    const top    = street.places.slice(0, half);
+    const bottom = street.places.slice(half);
+
+    html += `<div class="street-block">`;
+
+    // Fila superior
+    html += `<div class="places-row">`;
+    top.forEach(p => { html += placeChip(p); });
+    html += `</div>`;
+
+    // Banda de calle
+    html += `<div class="street-band">${street.name.toUpperCase()}</div>`;
+
+    // Fila inferior
+    html += `<div class="places-row bottom">`;
+    bottom.forEach(p => { html += placeChip(p); });
+    html += `</div>`;
+
+    html += `</div>`;
+  });
+
+  html += `</div>`; // streets-wrapper
+
+  // Stats
+  html += `<div class="stats-bar">
+    <div class="stat"><div class="stat-num">${data.total}</div><div class="stat-label">Negocios</div></div>
+    <div class="stat"><div class="stat-num">${data.streets.length}</div><div class="stat-label">Calles</div></div>
+    <div class="stat"><div class="stat-num">${data.radius}m</div><div class="stat-label">Radio</div></div>
+    <div class="stat"><div class="stat-num">${Object.keys(catCount).length}</div><div class="stat-label">Categorías</div></div>
+  </div>`;
+
+  // Categorías badge
+  html += `<div class="cat-summary">`;
+  Object.entries(catCount).sort((a,b)=>b[1]-a[1]).forEach(([cat, n]) => {
+    const color = LEGEND_CATS[cat] || '#546E7A';
+    html += `<span class="cat-badge" style="background:${color}">${cat} (${n})</span>`;
+  });
+  html += `</div>`;
+
+  // Leyenda
+  html += `<div class="legend">`;
+  Object.entries(LEGEND_CATS).forEach(([cat, color]) => {
+    html += `<div class="legend-item"><div class="legend-dot" style="background:${color}"></div>${cat}</div>`;
+  });
+  html += `</div>`;
+
+  container.innerHTML = html;
+
+  // Manejar errores de logo (mostrar fallback)
+  container.querySelectorAll('.place-logo-wrap img').forEach(img => {
+    img.onerror = function() {
+      const wrap = this.closest('.place-logo-wrap');
+      const color = wrap.dataset.color || '#546E7A';
+      const name  = wrap.dataset.name || '';
+      wrap.innerHTML = `<div class="fallback-text" style="background:${color}"></div>`;
+          // Mostrar nombre completo debajo del chip
+          const chip = wrap.closest('.place-chip');
+          if (chip && !chip.querySelector('.place-name')) {
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'place-name';
+            nameDiv.textContent = name;
+            nameDiv.title = name;
+            chip.appendChild(nameDiv);
+          }
+    };
+  });
+
+  document.getElementById('status').classList.remove('visible');
+  document.getElementById('keyplan-container').classList.add('visible');
+  document.getElementById('btn-export').style.display = 'inline-block';
+  document.getElementById('btn-map').style.display = '
