@@ -215,16 +215,7 @@ function escHtml(s) {
 }
 
 function onLogoError(img) {
-  var src = img.src || '';
-  if (src.indexOf('clearbit.com') !== -1) {
-    var domain = src.replace('https://logo.clearbit.com/', '');
-    img.onerror = function() { replaceFallback(img); };
-    img.src = 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=128';
-    img.style.height = '36px';
-    img.style.maxWidth = '36px';
-  } else {
-    replaceFallback(img);
-  }
+  replaceFallback(img);
 }
 
 function replaceFallback(img) {
