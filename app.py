@@ -190,14 +190,64 @@ BRAND_DOMAINS = {
     'h10': 'h10hotels.com', 'melia': 'melia.com',
     'nh': 'nh-hotels.es', 'ibis': 'ibis.com', 'novotel': 'novotel.com',
     'ac hotel': 'marriott.com', 'petit palace': 'petitpalace.com',
+    # Lujo / moda internacional
+    'gucci': 'gucci.com', 'prada': 'prada.com', 'chanel': 'chanel.com',
+    'dior': 'dior.com', 'louis vuitton': 'louisvuitton.com', 'lv': 'louisvuitton.com',
+    'hermes': 'hermes.com', 'hermes paris': 'hermes.com',
+    'tiffany': 'tiffany.com', 'cartier': 'cartier.com',
+    'burberry': 'burberry.com', 'valentino': 'valentino.com',
+    'versace': 'versace.com', 'armani': 'armani.com', 'emporio armani': 'armani.com',
+    'ralph lauren': 'ralphlauren.com', 'tommy hilfiger': 'tommy.com',
+    'michael kors': 'michaelkors.com', 'coach': 'coach.com',
+    'tod': 'tods.com', 'tods': 'tods.com',
+    'boss': 'hugoboss.com', 'hugo boss': 'hugoboss.com',
+    'loewe': 'loewe.com', 'camper': 'camper.com',
+    'tous': 'tous.com', 'pandora': 'pandora.net',
+    'swarovski': 'swarovski.com', 'folli follie': 'follifollie.com',
+    # Moda espanola / europea
+    'pedro del hierro': 'pedrodel hierro.com', 'pedro garcia': 'pedrogarcia.com',
+    'adolfo dominguez': 'adolfodominguez.com', 'custo': 'custo.com',
+    'munich': 'munichsports.com', 'levi': 'levi.com', 'levis': 'levi.com',
+    'timberland': 'timberland.com', 'clarks': 'clarks.com',
+    'geox': 'geox.com', 'pikolinos': 'pikolinos.com',
+    'guess': 'guess.com', 'calvin klein': 'calvinklein.com',
+    # Bancos / seguros adicionales
+    'bankinter': 'bankinter.com', 'ing': 'ing.es', 'unicaja': 'unicaja.es',
+    'kutxabank': 'kutxabank.es', 'ibercaja': 'ibercaja.es', 'openbank': 'openbank.es',
+    'generali': 'generali.es', 'allianz': 'allianz.es',
+    # Restaurantes / cafes
+    'viena capellanes': 'vienacapellanes.com', 'lizarrán': 'lizarran.es',
+    'la tagliatella': 'latagliatella.es', 'goiko': 'goiko.com',
+    'five guys': 'fiveguys.com', 'vips': 'vips.es',
+    'grosso napoletano': 'grossonapoletano.com', 'lateral': 'lateral.es',
+    'celicioso': 'celicioso.com', 'bocata': 'bocata.com',
+    # Deportes / ocio
+    'intersport': 'intersport.es', 'joma': 'joma.com',
+    # Optica / salud
+    'vision': 'visionlab.es', 'multioptical': 'multioptical.es',
+    'alain afflelou': 'alainafflelou.es', 'optica 2000': 'optica2000.es',
+    # Perfumeria / cosmetica
+    'rituals': 'rituals.com', 'kiehl': 'kiehls.com',
+    'nyx': 'nyxcosmetics.es', 'mac': 'maccosmetics.es',
+    # Papeleria / hogar
+    'casa del libro': 'casadellibro.com',
+    'opencor': 'opencor.es', 'dia': 'dia.es',
+    # Electronica
+    'huawei': 'huawei.com', 'xiaomi': 'xiaomi.es',
+    'pc componentes': 'pccomponentes.com',
 }
 
 def logo_url(name):
-    """Obtiene logo via icon.horse para marcas conocidas, vacio para el resto."""
+    """Intenta icon.horse para marcas conocidas; adivina dominio para el resto."""
     name_lower = name.lower().strip()
     for brand, domain in BRAND_DOMAINS.items():
         if brand in name_lower:
             return f"https://icon.horse/icon/{domain}"
+    # Intenta adivinar el dominio a partir del nombre
+    clean = re.sub(r'\s+(espana|spain|madrid|barcelona|es|sl|sa|slu|sll|s\.l\.)$', '', name_lower)
+    clean = re.sub(r'[^a-z0-9]', '', clean)
+    if len(clean) >= 3:
+        return f"https://icon.horse/icon/{clean}.com"
     return ""
 
 
