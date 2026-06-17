@@ -339,8 +339,7 @@ def keyplan():
         'bank','atm','beauty_salon','hair_care','spa','gym',
         'movie_theater','amusement_park','art_gallery','museum',
         'hospital','doctor','dentist','optician',
-        'car_dealer','car_rental','gas_station','parking',
-        'travel_agency','laundry','dry_cleaning',
+        'travel_agency',
     }
 
     def es_pie_de_calle(tipos):

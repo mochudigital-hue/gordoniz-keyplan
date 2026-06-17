@@ -252,91 +252,77 @@ function renderKeyPlan(data) {
     +'" width="76" height="'+(BAND-4)
     +'" rx="2" fill="rgba(255,230,150,0.85)" stroke="#E53935" stroke-width="3"/>');
 
-  /* 3. Place logos — ordered & non-overlapping */
-  var LOGO_H   = 90;
-  var LOGO_W   = 160;
-  var LOGO_GAP = 12;   /* gap between logo boxes */
-  var LOGO_OFF = BAND/2 + 68;  /* perpendicular dist from band center to logo center */
+  /* 3. Place logos — max 3 per street-side, index-based slots, streets labels on top */
+  var LOGO_H   = 88;
+  var LOGO_W   = 154;
+  var LOGO_GAP = 16;
+  var SLOT_W   = LOGO_W + LOGO_GAP;  /* 170px per slot along street */
+  var LOGO_OFF = BAND/2 + 72;        /* perpendicular from band center to logo center */
+  var MAX_PER_SIDE = 3;
 
-  /* Phase 1: assign each logo to a (street, side) group, sorted by along position */
-  var allPlaced = [];
+  /* Collect street labels to redraw ON TOP of logos */
+  var streetLabels = [];
+  var allPlaced    = [];
 
   metas.forEach(function(m) {
     var cosA = Math.cos(m.ang), sinA = Math.sin(m.ang);
-    var nx = -sinA, ny = cosA;  /* perpendicular unit vector */
+    var nx = -sinA, ny = cosA;
 
+    /* Save label info for later (draw on top) */
+    var lx = (m.cx + diag * 0.28);
+    var ly = m.cy;
+    streetLabels.push({ name: m.name, cx: m.cx, cy: m.cy, ang: m.ang, lx: lx, ly: ly });
+
+    /* Split into sides */
     var groups = { pos: [], neg: [] };
     m.places.forEach(function(p) {
       var relX = p.px - m.cx, relY = p.py - m.cy;
       var along = relX*cosA + relY*sinA;
       var perp  = relX*nx  + relY*ny;
       var key   = (perp >= 0) ? 'pos' : 'neg';
-      groups[key].push({ p: p, along: along });
+      groups[key].push({ p: p, along: along, hasLogo: !!p.logo });
     });
 
-    /* Phase 2: within each side, sort by along and enforce min spacing */
     ['pos', 'neg'].forEach(function(key) {
       var grp = groups[key];
       if (!grp.length) return;
       var sideSign = (key === 'pos') ? 1 : -1;
 
+      /* Sort: known brands first, then by along position */
+      grp.sort(function(a, b) {
+        if (a.hasLogo !== b.hasLogo) return a.hasLogo ? -1 : 1;
+        return a.along - b.along;
+      });
+
+      /* Keep only MAX_PER_SIDE */
+      grp = grp.slice(0, MAX_PER_SIDE);
+
+      /* Re-sort kept items by along so they appear in geographic order */
       grp.sort(function(a, b) { return a.along - b.along; });
 
-      /* Enforce minimum slot width between consecutive logos */
-      var slotW = LOGO_W + LOGO_GAP;
-      for (var i = 1; i < grp.length; i++) {
-        if (grp[i].along - grp[i-1].along < slotW) {
-          grp[i].along = grp[i-1].along + slotW;
-        }
-      }
+      /* Assign slot positions: center the group around the average along */
+      var n      = grp.length;
+      var avgAlong = grp.reduce(function(s, x) { return s + x.along; }, 0) / n;
+      /* Clamp center so group stays inside visible canvas */
+      var halfSpan = (n - 1) * SLOT_W / 2;
+      var minSafe  = -diag/2 + LOGO_W/2 + 8;
+      var maxSafe  =  diag/2 - LOGO_W/2 - 8;
+      avgAlong = Math.max(minSafe + halfSpan, Math.min(maxSafe - halfSpan, avgAlong));
 
-      /* Compute pixel positions */
-      grp.forEach(function(item) {
-        var lx = m.cx + item.along * cosA + sideSign * LOGO_OFF * nx;
-        var ly = m.cy + item.along * sinA + sideSign * LOGO_OFF * ny;
+      grp.forEach(function(item, idx) {
+        var slotAlong = avgAlong + (idx - (n-1)/2) * SLOT_W;
+        var lx = m.cx + slotAlong * cosA + sideSign * LOGO_OFF * nx;
+        var ly = m.cy + slotAlong * sinA + sideSign * LOGO_OFF * ny;
         lx = Math.max(LOGO_W/2 + 6, Math.min(W - LOGO_W/2 - 6, lx));
         ly = Math.max(LOGO_H/2 + 76, Math.min(H - LOGO_H/2 - 6, ly));
         item.p._lx = lx;
         item.p._ly = ly;
-        item.p._cosA = cosA;
-        item.p._sinA = sinA;
         allPlaced.push(item.p);
       });
     });
   });
 
-  /* Phase 3: global push-apart — push only along each logo's street axis */
-  for (var iter = 0; iter < 20; iter++) {
-    var moved = false;
-    for (var ai = 0; ai < allPlaced.length; ai++) {
-      for (var bi = ai + 1; bi < allPlaced.length; bi++) {
-        var pa = allPlaced[ai], pb = allPlaced[bi];
-        var dx = pb._lx - pa._lx, dy = pb._ly - pa._ly;
-        var ovX = (LOGO_W + LOGO_GAP) - Math.abs(dx);
-        var ovY = (LOGO_H + LOGO_GAP) - Math.abs(dy);
-        if (ovX > 0 && ovY > 0) {
-          /* Push each logo along ITS OWN street direction (not arbitrary) */
-          var pushAmt = Math.min(ovX, ovY) / 2 + 2;
-          /* For pa: push along its street cosA/sinA */
-          var dotA = dx * pa._cosA + dy * pa._sinA;
-          pa._lx -= pa._cosA * pushAmt * (dotA >= 0 ? 1 : -1);
-          pa._ly -= pa._sinA * pushAmt * (dotA >= 0 ? 1 : -1);
-          /* For pb: push along its street cosA/sinA */
-          var dotB = dx * pb._cosA + dy * pb._sinA;
-          pb._lx += pb._cosA * pushAmt * (dotB >= 0 ? 1 : -1);
-          pb._ly += pb._sinA * pushAmt * (dotB >= 0 ? 1 : -1);
-          pa._lx = Math.max(LOGO_W/2+6, Math.min(W-LOGO_W/2-6, pa._lx));
-          pa._ly = Math.max(LOGO_H/2+76, Math.min(H-LOGO_H/2-6, pa._ly));
-          pb._lx = Math.max(LOGO_W/2+6, Math.min(W-LOGO_W/2-6, pb._lx));
-          pb._ly = Math.max(LOGO_H/2+76, Math.min(H-LOGO_H/2-6, pb._ly));
-          moved = true;
-        }
-      }
-    }
-    if (!moved) break;
-  }
-
-  /* Phase 4: render all logos at their final positions */
+  /* Render logos */
   allPlaced.forEach(function(p) {
     var lx = p._lx, ly = p._ly;
     if (p.logo) {
@@ -344,19 +330,29 @@ function renderKeyPlan(data) {
         +'" width="'+LOGO_W+'" height="'+LOGO_H+'">');
       s.push('<div xmlns="http://www.w3.org/1999/xhtml"'
         +' style="width:'+LOGO_W+'px;height:'+LOGO_H+'px;display:flex;'
-        +'align-items:center;justify-content:center;overflow:hidden;">');
+        +'align-items:center;justify-content:center;overflow:hidden;background:white;border:1.5px solid #e0e0e0;border-radius:6px;">');
       s.push('<img src="'+escH(p.logo)+'" alt="'+escH(p.name)+'" title="'+escH(p.name)+'"'
-        +' style="max-height:'+LOGO_H+'px;max-width:'+LOGO_W+'px;object-fit:contain;"'
+        +' style="max-height:'+(LOGO_H-12)+'px;max-width:'+(LOGO_W-12)+'px;object-fit:contain;"'
         +' onerror="svgLogoErr(this)"/>');
       s.push('</div></foreignObject>');
     } else {
-      var label = p.name.length > 18 ? p.name.slice(0,16)+'..' : p.name;
-      var lw = Math.min(label.length * 9 + 16, 150);
-      s.push('<rect x="'+(lx-lw/2).toFixed(0)+'" y="'+(ly-18).toFixed(0)+'" width="'+lw+'" height="36"'
-        +' rx="4" fill="white" stroke="#bbb" stroke-width="1.5"/>');
-      s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+6).toFixed(0)+'" text-anchor="middle"'
-        +' fill="#222" font-family="Arial,sans-serif" font-size="11" font-weight="700">'+escH(label)+'</text>');
+      var label = p.name.length > 20 ? p.name.slice(0,18)+'..' : p.name;
+      var lw = Math.min(label.length * 8 + 20, LOGO_W);
+      s.push('<rect x="'+(lx-lw/2).toFixed(0)+'" y="'+(ly-18).toFixed(0)+'" width="'+lw+'" height="34"'
+        +' rx="5" fill="white" stroke="#ccc" stroke-width="1.5"/>');
+      s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+5).toFixed(0)+'" text-anchor="middle"'
+        +' fill="#333" font-family="Arial,sans-serif" font-size="11" font-weight="700">'+escH(label)+'</text>');
     }
+  });
+
+  /* Redraw street labels ON TOP so logos never cover them */
+  streetLabels.forEach(function(sl) {
+    var deg = (sl.ang * 180 / Math.PI).toFixed(3);
+    s.push('<text x="'+sl.lx.toFixed(1)+'" y="'+sl.ly.toFixed(1)+'"'
+      +' transform="rotate('+deg+','+sl.cx.toFixed(1)+','+sl.cy.toFixed(1)+')"'
+      +' text-anchor="middle" dominant-baseline="middle"'
+      +' fill="white" font-family="Arial,sans-serif" font-size="13"'
+      +' font-weight="900" letter-spacing="4">'+escH(sl.name.toUpperCase())+'</text>');
   });
 
   /* 4. Header overlay */
