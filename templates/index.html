@@ -275,8 +275,21 @@ function renderKeyPlan(data) {
       var ly = m.cy + along*sinA + side*LOGO_OFF*ny;
 
       /* Keep within SVG bounds */
-      lx = Math.max(LOGO_W/2+2, Math.min(W - LOGO_W/2 - 2, lx));
-      ly = Math.max(LOGO_H/2+72, Math.min(H - LOGO_H/2 - 4, ly));
+      lx = Math.max(LOGO_W/2+4, Math.min(W - LOGO_W/2 - 4, lx));
+      ly = Math.max(LOGO_H/2+74, Math.min(H - LOGO_H/2 - 4, ly));
+      /* Spread logos that land too close together along the street */
+      var minAlong = (LOGO_W + 6);
+      for (var pi = 0; pi < i; pi++) {
+        var op = m.places[pi];
+        if (!op._lx) continue;
+        var ddx = lx - op._lx, ddy = ly - op._ly;
+        var dist = Math.sqrt(ddx*ddx + ddy*ddy);
+        if (dist < 40) {
+          lx += cosA * (40 - dist + 4) * (along >= 0 ? 1 : -1);
+          ly += sinA * (40 - dist + 4) * (along >= 0 ? 1 : -1);
+        }
+      }
+      p._lx = lx; p._ly = ly;
 
       if (p.logo) {
         /* foreignObject lets us use <img onerror> inside SVG */
@@ -316,10 +329,9 @@ function renderKeyPlan(data) {
   s.push('</g>');
   s.push('<text x="68" y="30" font-family="Arial,sans-serif" font-size="16"'
     +' font-weight="900" fill="#1A3C5E" letter-spacing="1.5">GORDONIZ</text>');
-  s.push('<text x="68" y="48" font-family="Arial,sans-serif" font-size="7.5"'
-    +' fill="#888" letter-spacing="1.5">SERVICIOS </text>');
-  s.push('<text x="112" y="48" font-family="Arial,sans-serif" font-size="7.5"'
-    +' font-weight="700" fill="#E8A020" letter-spacing="1.5">INMOBILIARIOS</text>');
+  s.push('<text x="68" y="48" font-family="Arial,sans-serif" font-size="7.5" letter-spacing="1">'
+    +'<tspan fill="#888">SERVICIOS </tspan>'
+    +'<tspan fill="#E8A020" font-weight="700">INMOBILIARIOS</tspan></text>');
 
   /* KEY PLAN title — centered */
   s.push('<text x="'+(W/2)+'" y="26" text-anchor="middle" font-family="Arial,sans-serif"'
