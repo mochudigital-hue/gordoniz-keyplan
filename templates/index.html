@@ -266,15 +266,25 @@ function renderKeyPlan(data) {
       html += '<div class="kp-target"><div class="kp-target-arrow"></div><div class="kp-target-box"></div></div>';
     }
     top.forEach(function(p) {
-      html += '<img class="kp-logo" src="' + escHtml(p.logo) + '" alt="' + escHtml(p.name)
-        + '" title="' + escHtml(p.name) + '" onerror="onLogoError(this)">';
+      if (p.logo) {
+        html += '<img class="kp-logo" src="' + escHtml(p.logo) + '" alt="' + escHtml(p.name)
+          + '" title="' + escHtml(p.name) + '" onerror="onLogoError(this)">';
+      } else {
+        var nm = p.name.length > 16 ? p.name.slice(0,14) + '..' : p.name;
+        html += '<div class="kp-logo-text" title="' + escHtml(p.name) + '">' + escHtml(nm) + '</div>';
+      }
     });
     html += '</div>';
     html += '<div class="kp-street-band">' + escHtml(street.name.toUpperCase()) + '</div>';
     html += '<div class="kp-logos-row bottom">';
     bottom.forEach(function(p) {
-      html += '<img class="kp-logo" src="' + escHtml(p.logo) + '" alt="' + escHtml(p.name)
-        + '" title="' + escHtml(p.name) + '" onerror="onLogoError(this)">';
+      if (p.logo) {
+        html += '<img class="kp-logo" src="' + escHtml(p.logo) + '" alt="' + escHtml(p.name)
+          + '" title="' + escHtml(p.name) + '" onerror="onLogoError(this)">';
+      } else {
+        var nm = p.name.length > 16 ? p.name.slice(0,14) + '..' : p.name;
+        html += '<div class="kp-logo-text" title="' + escHtml(p.name) + '">' + escHtml(nm) + '</div>';
+      }
     });
     html += '</div></div>';
   });
