@@ -213,8 +213,14 @@ def index():
     import os
     template_path = os.path.join(os.path.dirname(__file__), 'templates', 'index.html')
     with open(template_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    return content
+        html = f.read()
+    # Ocultar campo de API key si el servidor ya tiene la key configurada
+    if SERVER_API_KEY:
+        html = html.replace(
+            'id="apikey-group">',
+            'id="apikey-group" style="display:none">'
+        )
+    return html
 
 
 @app.route("/api/keyplan", methods=["POST"])
