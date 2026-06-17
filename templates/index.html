@@ -8,28 +8,21 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef0f3; color: #222; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef0f3; }
 
 .panel {
-  background: white; padding: 16px 28px;
+  background: white; padding: 14px 24px;
   border-bottom: 3px solid #E8A020;
-  display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
+  display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
 }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field label { font-size: 10px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-.field input {
-  border: 1.5px solid #ccc; border-radius: 5px;
-  padding: 8px 12px; font-size: 13px; outline: none; background: #fafafa;
-}
+.field input { border: 1.5px solid #ccc; border-radius: 5px; padding: 8px 12px; font-size: 13px; outline: none; background: #fafafa; }
 .field input:focus { border-color: #1A3C5E; background: white; }
 .field-address input { width: 340px; }
 .field-radio input { width: 80px; }
 .field-key input { width: 260px; font-family: monospace; font-size: 11px; }
-.btn {
-  background: #E8A020; color: white; border: none; border-radius: 5px;
-  padding: 9px 22px; font-size: 13px; font-weight: 700; cursor: pointer;
-  height: 38px; white-space: nowrap; transition: background 0.2s;
-}
+.btn { background: #E8A020; color: white; border: none; border-radius: 5px; padding: 9px 22px; font-size: 13px; font-weight: 700; cursor: pointer; height: 38px; white-space: nowrap; transition: background 0.2s; }
 .btn:hover { background: #cf8c18; }
 .btn:disabled { background: #bbb; cursor: not-allowed; }
 .btn-dark { background: #1A3C5E; }
@@ -39,78 +32,23 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef0f3; color: #
 
 .status { text-align: center; padding: 24px; color: #666; font-size: 14px; display: none; }
 .status.visible { display: block; }
-.spinner {
-  display: inline-block; width: 18px; height: 18px;
-  border: 3px solid #ddd; border-top-color: #E8A020;
-  border-radius: 50%; animation: spin 0.8s linear infinite;
-  margin-right: 8px; vertical-align: middle;
-}
+.spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid #ddd; border-top-color: #E8A020; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-#keyplan-container { padding: 28px 32px; display: none; }
+#keyplan-container { padding: 24px 28px; display: none; }
 #keyplan-container.visible { display: block; }
+.keyplan { background: white; border-radius: 8px; box-shadow: 0 4px 28px rgba(0,0,0,0.10); overflow: hidden; max-width: 1200px; margin: 0 auto; }
+.keyplan svg { display: block; }
 
-.keyplan {
-  background: white; border-radius: 8px;
-  box-shadow: 0 4px 28px rgba(0,0,0,0.10);
-  padding: 28px 36px 36px; max-width: 1280px; margin: 0 auto;
-}
-
-.kp-header {
-  display: flex; align-items: flex-start;
-  margin-bottom: 24px; position: relative; min-height: 60px;
-}
-.kp-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; z-index: 1; }
-.kp-brand-texts { line-height: 1.25; }
-.kp-brand-name { font-size: 16px; font-weight: 900; color: #1A3C5E; letter-spacing: 1.5px; }
-.kp-brand-sub { font-size: 7.5px; color: #444; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
-.kp-brand-sub b { color: #E8A020; }
-
-.kp-title { position: absolute; left: 50%; top: 0; transform: translateX(-50%); text-align: center; white-space: nowrap; }
-.kp-title-label { font-size: 15px; font-weight: 700; text-decoration: underline; letter-spacing: 3px; color: #111; }
-.kp-title-street { font-size: 13px; font-weight: 600; color: #222; margin-top: 3px; }
-.kp-title-city { font-size: 11px; color: #555; margin-top: 1px; }
-
-.kp-street-block { margin-bottom: 4px; }
-
-.kp-logos-row {
-  display: flex; flex-wrap: wrap; align-items: flex-end;
-  gap: 12px 16px; padding: 16px 4px 10px; min-height: 96px;
-}
-.kp-logos-row.bottom { align-items: flex-start; padding: 10px 4px 16px; }
-
-.kp-logo { height: 56px; max-width: 150px; object-fit: contain; display: block; flex-shrink: 0; }
-
-.kp-logo-text {
-  height: 56px; max-width: 100px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 9px; font-weight: 700; color: #333; text-align: center;
-  word-break: break-word; line-height: 1.3;
-  border: 1px solid #ddd; border-radius: 4px; padding: 4px; background: #fafafa;
-}
-
-.kp-street-band {
-  background: #6B6B6B; color: white; padding: 10px 20px;
-  font-size: 18px; font-weight: 900; letter-spacing: 5px; text-transform: uppercase;
-}
-
-.kp-target { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
-.kp-target-arrow {
-  width: 0; height: 0;
-  border-left: 20px solid transparent; border-right: 20px solid transparent;
-  border-top: 28px solid #E53935; margin-bottom: 4px;
-}
-.kp-target-box { width: 86px; height: 56px; border: 3px solid #E53935; background: rgba(229,57,53,0.04); }
-
-#map-container { padding: 16px 32px; display: none; }
-#map { height: 580px; border-radius: 10px; border: 2px solid #ddd; }
+#map-container { padding: 16px 28px; display: none; }
+#map { height: 560px; border-radius: 10px; border: 2px solid #ddd; }
 
 @media print {
   body { background: white; }
-  .panel, .status { display: none !important; }
-  #keyplan-container { padding: 0; display: block !important; }
-  .keyplan { box-shadow: none; border-radius: 0; max-width: 100%; padding: 16px 20px; }
-  @page { size: A4 landscape; margin: 1cm; }
+  .panel, .status, #map-container { display: none !important; }
+  #keyplan-container { padding: 0 !important; display: block !important; }
+  .keyplan { box-shadow: none; border-radius: 0; }
+  @page { size: A4 landscape; margin: 0.8cm; }
 }
 </style>
 </head>
@@ -118,11 +56,11 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef0f3; color: #
 
 <div class="panel">
   <div style="display:flex;align-items:center;gap:9px;margin-right:6px;">
-    <svg width="36" height="36" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-      <polygon points="20,3 38,13 38,27 20,37 2,27 2,13" fill="#e8f0f8"/>
-      <polygon points="20,3 38,13 20,23 2,13" fill="#2E6B9E"/>
-      <polygon points="2,13 20,23 20,37 2,27" fill="#1A3C5E"/>
-      <polygon points="38,13 20,23 20,37 38,27" fill="#3A8FCC"/>
+    <svg width="36" height="36" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="22,3 41,13 41,28 22,38 3,28 3,13" fill="#e8f0f8"/>
+      <polygon points="22,3 41,13 22,23 3,13" fill="#2E6B9E"/>
+      <polygon points="3,13 22,23 22,38 3,28" fill="#1A3C5E"/>
+      <polygon points="41,13 22,23 22,38 41,28" fill="#3A8FCC"/>
     </svg>
     <div>
       <div style="font-size:13px;font-weight:900;color:#1A3C5E;letter-spacing:1px;">GORDONIZ</div>
@@ -195,9 +133,9 @@ async function generate() {
       body: JSON.stringify({ address: address, radius: radius, api_key: apikey })
     });
     var data = await resp.json();
-    if (!resp.ok || data.error) throw new Error(data.error || 'Error');
+    if (!resp.ok || data.error) throw new Error(data.error || 'Error del servidor');
     setStatus('Generando Key Plan...');
-    await sleep(200);
+    await new Promise(function(r){ setTimeout(r, 120); });
     lastData = data;
     renderKeyPlan(data);
   } catch(e) {
@@ -209,87 +147,192 @@ async function generate() {
 }
 
 function setStatus(msg) { document.getElementById('status-text').textContent = msg; }
-function sleep(ms) { return new Promise(function(r){ setTimeout(r, ms); }); }
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function escH(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
 }
 
-function onLogoError(img) {
-  replaceFallback(img);
-}
-
-function replaceFallback(img) {
-  var alt = img.alt || '';
-  if (alt && img.parentNode) {
-    var div = document.createElement('div');
-    div.className = 'kp-logo-text';
-    div.textContent = alt.length > 16 ? alt.slice(0,14) + '..' : alt;
-    div.title = alt;
-    img.parentNode.replaceChild(div, img);
-  } else if (img.parentNode) {
-    img.parentNode.removeChild(img);
-  }
-}
-
-var GORDONIZ_SVG = '<svg width="52" height="52" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">'
-  + '<polygon points="20,3 38,13 38,27 20,37 2,27 2,13" fill="#e8f0f8"/>'
-  + '<polygon points="20,3 38,13 20,23 2,13" fill="#2E6B9E"/>'
-  + '<polygon points="2,13 20,23 20,37 2,27" fill="#1A3C5E"/>'
-  + '<polygon points="38,13 20,23 20,37 38,27" fill="#3A8FCC"/>'
-  + '</svg>';
+/* ---- SVG MAP RENDERER ---- */
 
 function renderKeyPlan(data) {
   var container = document.getElementById('keyplan');
-  var parts = data.formatted_address.split(',');
-  var streetPart = (parts[0] || '').trim().toUpperCase();
-  var cityPart = parts.slice(-2).join(',').trim().toUpperCase();
 
-  var html = '<div class="kp-header">'
-    + '<div class="kp-brand">' + GORDONIZ_SVG
-    + '<div class="kp-brand-texts">'
-    + '<div class="kp-brand-name">GORDONIZ</div>'
-    + '<div class="kp-brand-sub">SERVICIOS <b>INMOBILIARIOS</b></div>'
-    + '</div></div>'
-    + '<div class="kp-title">'
-    + '<div class="kp-title-label">KEY PLAN</div>'
-    + '<div class="kp-title-street">' + escHtml(streetPart) + '</div>'
-    + '<div class="kp-title-city">' + escHtml(cityPart) + '</div>'
-    + '</div></div>';
+  var W = 1160, H = 740;
+  /* Target is slightly left-of-center to leave space for right-side labels */
+  var TX = Math.round(W * 0.44), TY = Math.round(H * 0.50);
 
-  data.streets.forEach(function(street, si) {
-    var half = Math.ceil(street.places.length / 2);
-    var top = street.places.slice(0, half);
-    var bottom = street.places.slice(half);
+  var cosLat = Math.cos(data.lat * Math.PI / 180);
+  /* Scale: pixels per meter. 260px covers the search radius. */
+  var scale = 260.0 / data.radius;
 
-    html += '<div class="kp-street-block"><div class="kp-logos-row">';
-    if (si === 0) {
-      html += '<div class="kp-target"><div class="kp-target-arrow"></div><div class="kp-target-box"></div></div>';
-    }
-    top.forEach(function(p) {
-      if (p.logo) {
-        html += '<img class="kp-logo" src="' + escHtml(p.logo) + '" alt="' + escHtml(p.name)
-          + '" title="' + escHtml(p.name) + '" onerror="onLogoError(this)">';
-      } else {
-        var nm = p.name.length > 16 ? p.name.slice(0,14) + '..' : p.name;
-        html += '<div class="kp-logo-text" title="' + escHtml(p.name) + '">' + escHtml(nm) + '</div>';
-      }
-    });
-    html += '</div>';
-    html += '<div class="kp-street-band">' + escHtml(street.name.toUpperCase()) + '</div>';
-    html += '<div class="kp-logos-row bottom">';
-    bottom.forEach(function(p) {
-      if (p.logo) {
-        html += '<img class="kp-logo" src="' + escHtml(p.logo) + '" alt="' + escHtml(p.name)
-          + '" title="' + escHtml(p.name) + '" onerror="onLogoError(this)">';
-      } else {
-        var nm = p.name.length > 16 ? p.name.slice(0,14) + '..' : p.name;
-        html += '<div class="kp-logo-text" title="' + escHtml(p.name) + '">' + escHtml(nm) + '</div>';
-      }
-    });
-    html += '</div></div>';
+  function proj(lat, lng) {
+    return [
+      TX + Math.round((lng - data.lng) * 111320 * cosLat * scale),
+      TY - Math.round((lat - data.lat) * 111320 * scale)
+    ];
+  }
+
+  /* Attach pixel coords to each place */
+  var streets = data.streets.map(function(s) {
+    return {
+      name: s.name,
+      places: s.places.map(function(p) {
+        var xy = (p.lat && p.lng) ? proj(p.lat, p.lng) : [TX, TY];
+        return { name: p.name, logo: p.logo || '', px: xy[0], py: xy[1] };
+      })
+    };
   });
 
-  container.innerHTML = html;
+  /* PCA: find primary direction of a set of points */
+  function pcaAngle(pts) {
+    var valid = pts.filter(function(p){ return Math.abs(p.px-TX)+Math.abs(p.py-TY) > 2; });
+    if (valid.length < 2) {
+      if (valid.length === 1) return Math.atan2(valid[0].py - TY, valid[0].px - TX);
+      return 0;
+    }
+    var n = valid.length, mx = 0, my = 0;
+    valid.forEach(function(p){ mx += p.px; my += p.py; });
+    mx /= n; my /= n;
+    var sxx=0, sxy=0, syy=0;
+    valid.forEach(function(p){
+      var dx = p.px-mx, dy = p.py-my;
+      sxx += dx*dx; sxy += dx*dy; syy += dy*dy;
+    });
+    return 0.5 * Math.atan2(2*sxy, sxx-syy);
+  }
+
+  var BAND = 58;   /* street band height in px */
+  var diag = Math.ceil(Math.sqrt(W*W + H*H)) + 40;
+
+  var s = [];
+  s.push('<svg width="'+W+'" height="'+H+'" xmlns="http://www.w3.org/2000/svg">');
+  s.push('<rect width="'+W+'" height="'+H+'" fill="white"/>');
+
+  /* Compute meta for each street */
+  var metas = streets.map(function(st) {
+    var n = st.places.length || 1;
+    var cx = st.places.reduce(function(a,p){return a+p.px;},0)/n;
+    var cy = st.places.reduce(function(a,p){return a+p.py;},0)/n;
+    var ang = pcaAngle(st.places);
+    return { name: st.name, places: st.places, cx: cx, cy: cy, ang: ang };
+  });
+
+  /* 1. Draw street bands */
+  metas.forEach(function(m) {
+    var deg = (m.ang * 180 / Math.PI).toFixed(3);
+    var bx  = (m.cx - diag/2).toFixed(1);
+    var by  = (m.cy - BAND/2).toFixed(1);
+    /* Band */
+    s.push('<rect x="'+bx+'" y="'+by+'" width="'+diag+'" height="'+BAND
+      +'" fill="#6B6B6B"'
+      +' transform="rotate('+deg+','+m.cx.toFixed(1)+','+m.cy.toFixed(1)+')"'
+      +'/>');
+    /* Street label — placed at 30% of diag from center along the band */
+    var lx = (m.cx + diag * 0.28).toFixed(1);
+    var ly = m.cy.toFixed(1);
+    s.push('<text x="'+lx+'" y="'+ly+'"'
+      +' transform="rotate('+deg+','+m.cx.toFixed(1)+','+m.cy.toFixed(1)+')"'
+      +' text-anchor="middle" dominant-baseline="middle"'
+      +' fill="white" font-family="Arial,sans-serif" font-size="13"'
+      +' font-weight="900" letter-spacing="4">'+escH(m.name.toUpperCase())+'</text>');
+  });
+
+  /* 2. Target property: red arrow + highlighted box ON the street */
+  var arrH = 30, arrW = 20;
+  s.push('<polygon points="'
+    +TX+','+(TY - BAND/2 - 2)+' '
+    +(TX-arrW)+','+(TY - BAND/2 - 2 - arrH)+' '
+    +(TX+arrW)+','+(TY - BAND/2 - 2 - arrH)
+    +'" fill="#E53935"/>');
+  s.push('<rect x="'+(TX-38)+'" y="'+(TY-BAND/2+2)
+    +'" width="76" height="'+(BAND-4)
+    +'" rx="2" fill="rgba(255,230,150,0.85)" stroke="#E53935" stroke-width="3"/>');
+
+  /* 3. Place logos perpendicular to their street */
+  var LOGO_OFF = BAND/2 + 36;   /* center-of-logo distance from band edge */
+  var LOGO_H   = 58;
+  var LOGO_W   = 120;
+
+  metas.forEach(function(m) {
+    var cosA = Math.cos(m.ang), sinA = Math.sin(m.ang);
+    /* Perpendicular unit vector */
+    var nx = -sinA, ny = cosA;
+
+    m.places.forEach(function(p, i) {
+      /* Project place onto street line */
+      var relX = p.px - m.cx, relY = p.py - m.cy;
+      var along = relX*cosA + relY*sinA;
+      var perp  = relX*nx  + relY*ny;
+
+      /* Determine side: use actual perpendicular sign, else alternate */
+      var side = (Math.abs(perp) > 8) ? (perp >= 0 ? 1 : -1) : (i%2===0 ? 1 : -1);
+
+      var lx = m.cx + along*cosA + side*LOGO_OFF*nx;
+      var ly = m.cy + along*sinA + side*LOGO_OFF*ny;
+
+      /* Keep within SVG bounds */
+      lx = Math.max(LOGO_W/2+2, Math.min(W - LOGO_W/2 - 2, lx));
+      ly = Math.max(LOGO_H/2+72, Math.min(H - LOGO_H/2 - 4, ly));
+
+      if (p.logo) {
+        /* foreignObject lets us use <img onerror> inside SVG */
+        s.push('<foreignObject x="'+(lx-LOGO_W/2).toFixed(0)+'" y="'+(ly-LOGO_H/2).toFixed(0)
+          +'" width="'+LOGO_W+'" height="'+LOGO_H+'">');
+        s.push('<div xmlns="http://www.w3.org/1999/xhtml"'
+          +' style="width:'+LOGO_W+'px;height:'+LOGO_H+'px;display:flex;'
+          +'align-items:center;justify-content:center;overflow:hidden;">');
+        s.push('<img src="'+escH(p.logo)+'" alt="'+escH(p.name)+'" title="'+escH(p.name)+'"'
+          +' style="max-height:'+LOGO_H+'px;max-width:'+LOGO_W+'px;object-fit:contain;"'
+          +' onerror="svgLogoErr(this)"/>');
+        s.push('</div></foreignObject>');
+      } else {
+        var label = p.name.length > 18 ? p.name.slice(0,16)+'..' : p.name;
+        s.push('<rect x="'+(lx-54).toFixed(0)+'" y="'+(ly-16).toFixed(0)+'" width="108" height="32"'
+          +' rx="3" fill="white" stroke="#ccc" stroke-width="1"/>');
+        s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+5).toFixed(0)+'" text-anchor="middle"'
+          +' fill="#333" font-family="Arial,sans-serif" font-size="9.5" font-weight="700">'+escH(label)+'</text>');
+      }
+    });
+  });
+
+  /* 4. Header overlay */
+  var parts  = data.formatted_address.split(',');
+  var addrL1 = (parts[0] || '').trim().toUpperCase();
+  var addrL2 = parts.slice(-2).join(',').trim().toUpperCase();
+
+  s.push('<rect x="0" y="0" width="'+W+'" height="72" fill="rgba(255,255,255,0.95)"/>');
+  s.push('<rect x="0" y="0" width="'+W+'" height="72" fill="none" stroke="#eee" stroke-width="1"/>');
+
+  /* Gordoniz cube logo */
+  s.push('<g transform="translate(14,12)">');
+  s.push('<polygon points="24,2 44,12 44,26 24,36 4,26 4,12" fill="#e8f0f8"/>');
+  s.push('<polygon points="24,2 44,12 24,22 4,12" fill="#2E6B9E"/>');
+  s.push('<polygon points="4,12 24,22 24,36 4,26" fill="#1A3C5E"/>');
+  s.push('<polygon points="44,12 24,22 24,36 44,26" fill="#3A8FCC"/>');
+  s.push('</g>');
+  s.push('<text x="68" y="30" font-family="Arial,sans-serif" font-size="16"'
+    +' font-weight="900" fill="#1A3C5E" letter-spacing="1.5">GORDONIZ</text>');
+  s.push('<text x="68" y="48" font-family="Arial,sans-serif" font-size="7.5"'
+    +' fill="#888" letter-spacing="1.5">SERVICIOS </text>');
+  s.push('<text x="112" y="48" font-family="Arial,sans-serif" font-size="7.5"'
+    +' font-weight="700" fill="#E8A020" letter-spacing="1.5">INMOBILIARIOS</text>');
+
+  /* KEY PLAN title — centered */
+  s.push('<text x="'+(W/2)+'" y="26" text-anchor="middle" font-family="Arial,sans-serif"'
+    +' font-size="15" font-weight="700" fill="#111" letter-spacing="3"'
+    +' text-decoration="underline">KEY PLAN</text>');
+  s.push('<text x="'+(W/2)+'" y="46" text-anchor="middle" font-family="Arial,sans-serif"'
+    +' font-size="12" font-weight="600" fill="#222">'+escH(addrL1)+'</text>');
+  s.push('<text x="'+(W/2)+'" y="62" text-anchor="middle" font-family="Arial,sans-serif"'
+    +' font-size="10" fill="#555">'+escH(addrL2)+'</text>');
+
+  s.push('</svg>');
+
+  container.innerHTML = s.join('');
   document.getElementById('status').classList.remove('visible');
   document.getElementById('keyplan-container').classList.add('visible');
   document.getElementById('btn-export').style.display = 'inline-block';
@@ -298,10 +341,44 @@ function renderKeyPlan(data) {
   if (window._leafletMap) { window._leafletMap.remove(); window._leafletMap = null; }
 }
 
+/* Called by onerror inside foreignObject */
+function svgLogoErr(img) {
+  /* Replace with text label */
+  var name = img.alt || '';
+  var label = name.length > 18 ? name.slice(0,16)+'..' : name;
+  var fo = img.closest ? img.closest('foreignObject') : null;
+  if (!fo) { img.style.display='none'; return; }
+  var svgEl = fo.closest ? fo.closest('svg') : null;
+  if (!svgEl) { img.style.display='none'; return; }
+  var x = parseFloat(fo.getAttribute('x')) + 54;
+  var y = parseFloat(fo.getAttribute('y')) + 16;
+  var rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  rect.setAttribute('x', x - 54);
+  rect.setAttribute('y', y);
+  rect.setAttribute('width','108');
+  rect.setAttribute('height','32');
+  rect.setAttribute('rx','3');
+  rect.setAttribute('fill','white');
+  rect.setAttribute('stroke','#ccc');
+  var txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+  txt.setAttribute('x', x);
+  txt.setAttribute('y', y + 21);
+  txt.setAttribute('text-anchor','middle');
+  txt.setAttribute('fill','#333');
+  txt.setAttribute('font-family','Arial,sans-serif');
+  txt.setAttribute('font-size','9.5');
+  txt.setAttribute('font-weight','700');
+  txt.textContent = label;
+  svgEl.appendChild(rect);
+  svgEl.appendChild(txt);
+  fo.style.display = 'none';
+}
+
+/* MAP */
 function toggleMap() {
   var mapDiv = document.getElementById('map-container');
   var btn = document.getElementById('btn-map');
-  if (mapDiv.style.display === 'none' || !mapDiv.style.display) {
+  if (mapDiv.style.display !== 'block') {
     mapDiv.style.display = 'block'; btn.textContent = 'X Cerrar Mapa'; initMap(lastData);
   } else {
     mapDiv.style.display = 'none'; btn.textContent = 'Ver Mapa';
@@ -315,27 +392,27 @@ function initMap(data) {
   var map = L.map('map').setView([data.lat, data.lng], 17);
   window._leafletMap = map;
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 21
+    attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:21
   }).addTo(map);
   L.circle([data.lat, data.lng], {
-    radius: data.radius, color: '#1A3C5E', fillColor: '#1A3C5E', fillOpacity: 0.06, weight: 2
+    radius: data.radius, color:'#1A3C5E', fillColor:'#1A3C5E', fillOpacity:0.06, weight:2
   }).addTo(map);
-  var pinHtml = '<div style="background:#E8A020;color:white;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:800;border:2px solid white;">LOCAL</div>';
-  L.marker([data.lat, data.lng], {
-    icon: L.divIcon({ className:'', html: pinHtml, iconAnchor:[30,0] }), zIndexOffset: 1000
-  }).addTo(map).bindPopup('<b>' + escHtml(data.formatted_address) + '</b>');
-  data.streets.forEach(function(street) {
-    street.places.forEach(function(p) {
+  var pinHtml='<div style="background:#E8A020;color:white;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:800;border:2px solid white;">LOCAL</div>';
+  L.marker([data.lat,data.lng], {
+    icon: L.divIcon({className:'',html:pinHtml,iconAnchor:[30,0]}), zIndexOffset:1000
+  }).addTo(map).bindPopup('<b>'+escH(data.formatted_address)+'</b>');
+  data.streets.forEach(function(st) {
+    st.places.forEach(function(p) {
       if (!p.lat || !p.lng) return;
-      var name = p.name.length > 20 ? p.name.slice(0,19) + '..' : p.name;
-      var h = '<div style="background:white;border:2px solid ' + p.color + ';padding:3px 8px;border-radius:16px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);">' + escHtml(name) + '</div>';
-      L.marker([p.lat, p.lng], { icon: L.divIcon({ className:'', html: h, iconAnchor:[0,12] }) })
-        .addTo(map).bindPopup('<b>' + escHtml(p.name) + '</b><br><small>' + escHtml(p.vicinity) + '</small>');
+      var nm = p.name.length>22 ? p.name.slice(0,20)+'..' : p.name;
+      var h='<div style="background:white;border:2px solid #1A3C5E;padding:3px 8px;border-radius:16px;font-size:11px;font-weight:700;white-space:nowrap;">'+nm+'</div>';
+      L.marker([p.lat,p.lng], {icon: L.divIcon({className:'',html:h,iconAnchor:[0,12]})})
+        .addTo(map).bindPopup('<b>'+escH(p.name)+'</b><br><small>'+escH(p.vicinity||'')+'</small>');
     });
   });
 }
 
-document.addEventListener('keydown', function(e) { if (e.key === 'Enter') generate(); });
+document.addEventListener('keydown', function(e){ if(e.key==='Enter') generate(); });
 </script>
 </body>
 </html>
