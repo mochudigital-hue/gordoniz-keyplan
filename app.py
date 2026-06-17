@@ -198,7 +198,7 @@ def logo_url(name):
     for brand, domain in BRAND_DOMAINS.items():
         if brand in name_lower:
             return f"https://icon.horse/icon/{domain}"
-    return """
+    return ""
 
 
 @app.route("/api/config")
