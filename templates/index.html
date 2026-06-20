@@ -202,6 +202,8 @@ function renderKeyPlan(data) {
   var s = [];
   s.push('<svg width="'+W+'" height="'+H+'" xmlns="http://www.w3.org/2000/svg">');
   s.push('<rect width="'+W+'" height="'+H+'" fill="white"/>');
+  /* clip para que nada salga del canvas (excepto cabecera) */
+  s.push('<defs><clipPath id="cc"><rect x="0" y="76" width="'+W+'" height="'+(H-76)+'"/></clipPath></defs>');
 
   var metas = streets.map(function(st) {
     var n = st.places.length || 1;
@@ -236,8 +238,10 @@ function renderKeyPlan(data) {
   s.push('<polygon points="'+TX+','+(TY-BAND/2-2)+' '+(TX-arrW)+','+(TY-BAND/2-2-arrH)+' '+(TX+arrW)+','+(TY-BAND/2-2-arrH)+'" fill="#E53935"/>');
   s.push('<rect x="'+(TX-38)+'" y="'+(TY-BAND/2+2)+'" width="76" height="'+(BAND-4)+'" rx="2" fill="rgba(255,230,150,0.85)" stroke="#E53935" stroke-width="3"/>');
 
-  var LOGO_H=62, LOGO_W=108, LABEL_H=15, SLOT_W=118;
-  var LOGO_OFF_BASE=BAND/2+22, ROW_STEP=LOGO_H+LABEL_H+8;
+  /* Cajas cuadradas, todas del mismo tamaño */
+  var BOX=82, NAME_H=16;
+  var SLOT=BOX+8, ROW_STEP=BOX+NAME_H+8;
+  var LOGO_OFF_BASE=BAND/2+14+BOX/2;
   var MAX_COLS=5;
   var allPlaced=[];
 
@@ -261,41 +265,39 @@ function renderKeyPlan(data) {
         var colIdx=idx%MAX_COLS;
         var rowSize=Math.min(MAX_COLS, grp.length-rowIdx*MAX_COLS);
         var rowOff=LOGO_OFF_BASE+rowIdx*ROW_STEP;
-        var colOff=(colIdx-(rowSize-1)/2)*SLOT_W;
+        var colOff=(colIdx-(rowSize-1)/2)*SLOT;
         var lx=m.cx+colOff*cosA+sideSign*rowOff*nx;
         var ly=m.cy+colOff*sinA+sideSign*rowOff*ny;
-        lx=Math.max(LOGO_W/2+6,Math.min(W-LOGO_W/2-6,lx));
-        ly=Math.max(LOGO_H/2+80,Math.min(H-LOGO_H/2-LABEL_H-6,ly));
+        lx=Math.max(BOX/2+4,Math.min(W-BOX/2-4,lx));
+        ly=Math.max(BOX/2+80,Math.min(H-BOX/2-NAME_H-4,ly));
         item.p._lx=lx; item.p._ly=ly;
         allPlaced.push(item.p);
       });
     });
   });
 
+  /* Cajas cuadradas BOX×BOX */
   allPlaced.forEach(function(p) {
     var lx=p._lx, ly=p._ly;
+    var half=BOX/2;
+    s.push('<rect x="'+(lx-half).toFixed(0)+'" y="'+(ly-half).toFixed(0)+'" width="'+BOX+'" height="'+BOX+'" rx="6" fill="white" stroke="#ccc" stroke-width="1.5" clip-path="url(#cc)"/>');
     if (p.logo) {
-      s.push('<rect x="'+(lx-LOGO_W/2-2).toFixed(0)+'" y="'+(ly-LOGO_H/2-2).toFixed(0)+'" width="'+(LOGO_W+4)+'" height="'+(LOGO_H+4)+'" rx="7" fill="white" stroke="#ddd" stroke-width="1.5"/>');
-      s.push('<foreignObject x="'+(lx-LOGO_W/2).toFixed(0)+'" y="'+(ly-LOGO_H/2).toFixed(0)+'" width="'+LOGO_W+'" height="'+LOGO_H+'">');
-      s.push('<div xmlns="http://www.w3.org/1999/xhtml" style="width:'+LOGO_W+'px;height:'+LOGO_H+'px;display:flex;align-items:center;justify-content:center;overflow:hidden;">');
-      s.push('<img src="'+escH(p.logo)+'" alt="'+escH(p.name)+'" title="'+escH(p.name)+'" style="max-height:'+(LOGO_H-10)+'px;max-width:'+(LOGO_W-10)+'px;object-fit:contain;" onerror="svgLogoErr(this)"/>');
-      s.push('<\/div><\/foreignObject>');
-      var nameLabel=p.name.length>22?p.name.slice(0,20)+'..':p.name;
-      s.push('<rect x="'+(lx-LOGO_W/2).toFixed(0)+'" y="'+(ly+LOGO_H/2+2).toFixed(0)+'" width="'+LOGO_W+'" height="16" rx="3" fill="rgba(255,255,255,0.92)"/>');
-      s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+LOGO_H/2+13).toFixed(0)+'" text-anchor="middle" fill="#222" font-family="Arial,sans-serif" font-size="9.5" font-weight="700">'+escH(nameLabel)+'<\/text>');
-    } else {
-      var label=p.name.length>20?p.name.slice(0,18)+'..':p.name;
-      var lw=Math.min(label.length*7.5+20,LOGO_W);
-      s.push('<rect x="'+(lx-lw/2).toFixed(0)+'" y="'+(ly-16).toFixed(0)+'" width="'+lw+'" height="32" rx="5" fill="white" stroke="#bbb" stroke-width="1.5"/>');
-      s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+5).toFixed(0)+'" text-anchor="middle" fill="#333" font-family="Arial,sans-serif" font-size="11" font-weight="700">'+escH(label)+'<\/text>');
+      s.push('<foreignObject x="'+(lx-half).toFixed(0)+'" y="'+(ly-half).toFixed(0)+'" width="'+BOX+'" height="'+BOX+'" clip-path="url(#cc)">');
+      s.push('<div xmlns="http://www.w3.org/1999/xhtml" style="width:'+BOX+'px;height:'+BOX+'px;display:flex;align-items:center;justify-content:center;overflow:hidden;">');
+      s.push('<img src="'+escH(p.logo)+'" style="max-height:'+(BOX-14)+'px;max-width:'+(BOX-14)+'px;object-fit:contain;" onerror="svgLogoErr(this)"/>');
+      s.push('</div></foreignObject>');
     }
+    var nameLabel=p.name.length>18?p.name.slice(0,16)+'..':p.name;
+    s.push('<rect x="'+(lx-half).toFixed(0)+'" y="'+(ly+half).toFixed(0)+'" width="'+BOX+'" height="'+NAME_H+'" fill="#f5f5f5" stroke="#ccc" stroke-width="1" clip-path="url(#cc)"/>');
+    s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+half+NAME_H-4).toFixed(0)+'" text-anchor="middle" fill="#222" font-family="Arial,sans-serif" font-size="9" font-weight="700" clip-path="url(#cc)">'+escH(nameLabel)+'</text>');
   });
 
+  /* Nombres de calle dentro del canvas */
   metas.forEach(function(m) {
     var deg=(m.ang*180/Math.PI).toFixed(3);
-    var lx=(m.cx+diag*0.28).toFixed(1);
-    var ly=m.cy.toFixed(1);
-    s.push('<text x="'+lx+'" y="'+ly+'" transform="rotate('+deg+','+m.cx.toFixed(1)+','+m.cy.toFixed(1)+')" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial,sans-serif" font-size="13" font-weight="900" letter-spacing="4">'+escH(m.name.toUpperCase())+'<\/text>');
+    var lx=Math.max(60, Math.min(W-60, m.cx)).toFixed(1);
+    var ly=Math.max(80, Math.min(H-20, m.cy)).toFixed(1);
+    s.push('<text x="'+lx+'" y="'+ly+'" transform="rotate('+deg+','+lx+','+ly+')" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial,sans-serif" font-size="12" font-weight="900" letter-spacing="3" clip-path="url(#cc)">'+escH(m.name.toUpperCase())+'</text>');
   });
 
   var parts=data.formatted_address.split(',');
@@ -309,13 +311,13 @@ function renderKeyPlan(data) {
   s.push('<polygon points="24,2 44,12 24,22 4,12" fill="#2E6B9E"/>');
   s.push('<polygon points="4,12 24,22 24,36 4,26" fill="#1A3C5E"/>');
   s.push('<polygon points="44,12 24,22 24,36 44,26" fill="#3A8FCC"/>');
-  s.push('<\/g>');
-  s.push('<text x="68" y="30" font-family="Arial,sans-serif" font-size="16" font-weight="900" fill="#1A3C5E" letter-spacing="1.5">GORDONIZ<\/text>');
-  s.push('<text x="68" y="48" font-family="Arial,sans-serif" font-size="7.5" letter-spacing="1"><tspan fill="#888">SERVICIOS <\/tspan><tspan fill="#E8A020" font-weight="700">INMOBILIARIOS<\/tspan><\/text>');
-  s.push('<text x="'+(W/2)+'" y="26" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#111" letter-spacing="3" text-decoration="underline">KEY PLAN<\/text>');
-  s.push('<text x="'+(W/2)+'" y="46" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="600" fill="#222">'+escH(addrL1)+'<\/text>');
-  s.push('<text x="'+(W/2)+'" y="62" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" fill="#555">'+escH(addrL2)+'<\/text>');
-  s.push('<\/svg>');
+  s.push('</g>');
+  s.push('<text x="68" y="30" font-family="Arial,sans-serif" font-size="16" font-weight="900" fill="#1A3C5E" letter-spacing="1.5">GORDONIZ</text>');
+  s.push('<text x="68" y="48" font-family="Arial,sans-serif" font-size="7.5" letter-spacing="1"><tspan fill="#888">SERVICIOS </tspan><tspan fill="#E8A020" font-weight="700">INMOBILIARIOS</tspan></text>');
+  s.push('<text x="'+(W/2)+'" y="26" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#111" letter-spacing="3" text-decoration="underline">KEY PLAN</text>');
+  s.push('<text x="'+(W/2)+'" y="46" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="600" fill="#222">'+escH(addrL1)+'</text>');
+  s.push('<text x="'+(W/2)+'" y="62" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" fill="#555">'+escH(addrL2)+'</text>');
+  s.push('</svg>');
 
   container.innerHTML=s.join('');
   document.getElementById('status').classList.remove('visible');
@@ -333,16 +335,16 @@ function svgLogoErr(img) {
   if(!fo){img.style.display='none';return;}
   var svgEl=fo.closest?fo.closest('svg'):null;
   if(!svgEl){img.style.display='none';return;}
-  var x=parseFloat(fo.getAttribute('x'))+54;
+  var x=parseFloat(fo.getAttribute('x'))+41;
   var y=parseFloat(fo.getAttribute('y'))+16;
   var rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
-  rect.setAttribute('x',x-54);rect.setAttribute('y',y);
-  rect.setAttribute('width','108');rect.setAttribute('height','32');
-  rect.setAttribute('rx','3');rect.setAttribute('fill','white');rect.setAttribute('stroke','#ccc');
+  rect.setAttribute('x',x-41);rect.setAttribute('y',y-16);
+  rect.setAttribute('width','82');rect.setAttribute('height','82');
+  rect.setAttribute('rx','6');rect.setAttribute('fill','#f9f9f9');rect.setAttribute('stroke','#ccc');
   var txt=document.createElementNS('http://www.w3.org/2000/svg','text');
-  txt.setAttribute('x',x);txt.setAttribute('y',y+21);
-  txt.setAttribute('text-anchor','middle');txt.setAttribute('fill','#333');
-  txt.setAttribute('font-family','Arial,sans-serif');txt.setAttribute('font-size','9.5');txt.setAttribute('font-weight','700');
+  txt.setAttribute('x',x);txt.setAttribute('y',y+10);
+  txt.setAttribute('text-anchor','middle');txt.setAttribute('fill','#555');
+  txt.setAttribute('font-family','Arial,sans-serif');txt.setAttribute('font-size','9');txt.setAttribute('font-weight','700');
   txt.textContent=label;
   svgEl.appendChild(rect);svgEl.appendChild(txt);
   fo.style.display='none';
@@ -366,14 +368,14 @@ function initMap(data) {
   window._leafletMap=map;
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:21}).addTo(map);
   L.circle([data.lat,data.lng],{radius:data.radius,color:'#1A3C5E',fillColor:'#1A3C5E',fillOpacity:0.06,weight:2}).addTo(map);
-  var pinHtml='<div style="background:#E8A020;color:white;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:800;border:2px solid white;">LOCAL<\/div>';
-  L.marker([data.lat,data.lng],{icon:L.divIcon({className:'',html:pinHtml,iconAnchor:[30,0]}),zIndexOffset:1000}).addTo(map).bindPopup('<b>'+escH(data.formatted_address)+'<\/b>');
+  var pinHtml='<div style="background:#E8A020;color:white;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:800;border:2px solid white;">LOCAL</div>';
+  L.marker([data.lat,data.lng],{icon:L.divIcon({className:'',html:pinHtml,iconAnchor:[30,0]}),zIndexOffset:1000}).addTo(map).bindPopup('<b>'+escH(data.formatted_address)+'</b>');
   data.streets.forEach(function(st){
     st.places.forEach(function(p){
       if(!p.lat||!p.lng)return;
       var nm=p.name.length>22?p.name.slice(0,20)+'..':p.name;
-      var h='<div style="background:white;border:2px solid #1A3C5E;padding:3px 8px;border-radius:16px;font-size:11px;font-weight:700;white-space:nowrap;">'+nm+'<\/div>';
-      L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:h,iconAnchor:[0,12]})}).addTo(map).bindPopup('<b>'+escH(p.name)+'<\/b><br><small>'+escH(p.vicinity||'')+'<\/small>');
+      var h='<div style="background:white;border:2px solid #1A3C5E;padding:3px 8px;border-radius:16px;font-size:11px;font-weight:700;white-space:nowrap;">'+nm+'</div>';
+      L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:h,iconAnchor:[0,12]})}).addTo(map).bindPopup('<b>'+escH(p.name)+'</b><br><small>'+escH(p.vicinity||'')+'</small>');
     });
   });
 }
