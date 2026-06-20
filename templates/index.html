@@ -156,17 +156,11 @@ function escH(s) {
     .replace(/"/g,'&quot;');
 }
 
-/* ---- SVG MAP RENDERER ---- */
-
 function renderKeyPlan(data) {
   var container = document.getElementById('keyplan');
-
   var W = 1160, H = 740;
-  /* Target is slightly left-of-center to leave space for right-side labels */
   var TX = Math.round(W * 0.44), TY = Math.round(H * 0.50);
-
   var cosLat = Math.cos(data.lat * Math.PI / 180);
-  /* Scale: pixels per meter. 260px covers the search radius. */
   var scale = 260.0 / data.radius;
 
   function proj(lat, lng) {
@@ -176,7 +170,6 @@ function renderKeyPlan(data) {
     ];
   }
 
-  /* Attach pixel coords to each place */
   var streets = data.streets.map(function(s) {
     return {
       name: s.name,
@@ -187,7 +180,6 @@ function renderKeyPlan(data) {
     };
   });
 
-  /* PCA: find primary direction of a set of points */
   function pcaAngle(pts) {
     var valid = pts.filter(function(p){ return Math.abs(p.px-TX)+Math.abs(p.py-TY) > 2; });
     if (valid.length < 2) {
@@ -205,14 +197,12 @@ function renderKeyPlan(data) {
     return 0.5 * Math.atan2(2*sxy, sxx-syy);
   }
 
-  var BAND = 58;   /* street band height in px */
+  var BAND = 46;
   var diag = Math.ceil(Math.sqrt(W*W + H*H)) + 40;
-
   var s = [];
   s.push('<svg width="'+W+'" height="'+H+'" xmlns="http://www.w3.org/2000/svg">');
   s.push('<rect width="'+W+'" height="'+H+'" fill="white"/>');
 
-  /* ── STREET META ─────────────────────────────────────────── */
   var metas = streets.map(function(st) {
     var n = st.places.length || 1;
     var cx = st.places.reduce(function(a,p){return a+p.px;},0)/n;
@@ -221,13 +211,8 @@ function renderKeyPlan(data) {
     return { name: st.name, places: st.places, cx: cx, cy: cy, ang: ang };
   });
 
-  /* ── IDENTIFY TARGET STREET & FILTER PARALLELS ────────────
-     Keep: target street + streets whose angle differs ≥45° from it.
-     Parallel streets (angle diff <45°) show band+label but NO logos.
-  ─────────────────────────────────────────────────────────── */
   var targetName = data.target_street || '';
-  var targetMeta = metas.find(function(m){ return m.name === targetName; })
-                || metas[0];
+  var targetMeta = metas.find(function(m){ return m.name === targetName; }) || metas[0];
   var targetAng  = targetMeta ? targetMeta.ang : 0;
 
   function angDiff(a, b) {
@@ -235,249 +220,172 @@ function renderKeyPlan(data) {
     return d > Math.PI/2 ? Math.PI - d : d;
   }
 
-  /* classify each street */
   metas.forEach(function(m) {
     var diff = angDiff(m.ang, targetAng);
-    /* "crossing" = perpendicular-ish (diff ≥ 40°) OR it IS the target street */
     m.isCrossing = (diff >= 40 * Math.PI/180) || (m.name === targetMeta.name);
   });
 
-  /* ── 1. DRAW ALL STREET BANDS ──────────────────────────── */
   metas.forEach(function(m) {
+    if (!m.isCrossing) return;
     var deg = (m.ang * 180 / Math.PI).toFixed(3);
     var bx  = (m.cx - diag/2).toFixed(1);
     var by  = (m.cy - BAND/2).toFixed(1);
-    s.push('<rect x="'+bx+'" y="'+by+'" width="'+diag+'" height="'+BAND
-      +'" fill="#6B6B6B"'
-      +' transform="rotate('+deg+','+m.cx.toFixed(1)+','+m.cy.toFixed(1)+')"'
-      +'/>');
+    s.push('<rect x="'+bx+'" y="'+by+'" width="'+diag+'" height="'+BAND+'" fill="#6B6B6B" transform="rotate('+deg+','+m.cx.toFixed(1)+','+m.cy.toFixed(1)+')"'+'/>' );
   });
 
-  /* ── 2. TARGET ARROW + BOX ─────────────────────────────── */
   var arrH = 30, arrW = 20;
-  s.push('<polygon points="'
-    +TX+','+(TY - BAND/2 - 2)+' '
-    +(TX-arrW)+','+(TY - BAND/2 - 2 - arrH)+' '
-    +(TX+arrW)+','+(TY - BAND/2 - 2 - arrH)
-    +'" fill="#E53935"/>');
-  s.push('<rect x="'+(TX-38)+'" y="'+(TY-BAND/2+2)
-    +'" width="76" height="'+(BAND-4)
-    +'" rx="2" fill="rgba(255,230,150,0.85)" stroke="#E53935" stroke-width="3"/>');
+  s.push('<polygon points="'+TX+','+(TY-BAND/2-2)+' '+(TX-arrW)+','+(TY-BAND/2-2-arrH)+' '+(TX+arrW)+','+(TY-BAND/2-2-arrH)+'" fill="#E53935"/>');
+  s.push('<rect x="'+(TX-38)+'" y="'+(TY-BAND/2+2)+'" width="76" height="'+(BAND-4)+'" rx="2" fill="rgba(255,230,150,0.85)" stroke="#E53935" stroke-width="3"/>');
 
-  /* ── 3. LOGO PLACEMENT — crossing streets only ─────────── */
-  var LOGO_H     = 88;
-  var LOGO_W     = 150;
-  var LOGO_GAP   = 20;
-  var SLOT_W     = LOGO_W + LOGO_GAP;  /* 170 px per slot along street */
-  var LOGO_OFF   = BAND/2 + 80;        /* perp distance: band-center → logo-center */
-  var MAX_PER_SIDE = 2;                 /* max logos each side of each crossing street */
-
-  var allPlaced = [];
+  var LOGO_H=88, LOGO_W=150, LOGO_GAP=20, SLOT_W=170;
+  var LOGO_OFF=BAND/2+80, MAX_PER_SIDE=2;
+  var allPlaced=[];
 
   metas.forEach(function(m) {
-    if (!m.isCrossing) return;   /* skip parallel streets */
-
-    var cosA = Math.cos(m.ang), sinA = Math.sin(m.ang);
-    var nx = -sinA, ny = cosA;   /* perpendicular unit vector */
-
-    /* Split places into sides */
-    var groups = { pos: [], neg: [] };
+    if (!m.isCrossing) return;
+    var cosA=Math.cos(m.ang), sinA=Math.sin(m.ang);
+    var nx=-sinA, ny=cosA;
+    var groups={pos:[],neg:[]};
     m.places.forEach(function(p) {
-      var relX = p.px - m.cx, relY = p.py - m.cy;
-      var along = relX*cosA + relY*sinA;
-      var perp  = relX*nx  + relY*ny;
-      groups[perp >= 0 ? 'pos' : 'neg'].push({ p:p, along:along, hasLogo:!!p.logo });
+      var relX=p.px-m.cx, relY=p.py-m.cy;
+      var along=relX*cosA+relY*sinA;
+      var perp=relX*nx+relY*ny;
+      groups[perp>=0?'pos':'neg'].push({p:p,along:along,hasLogo:!!p.logo});
     });
-
     ['pos','neg'].forEach(function(key) {
-      var grp = groups[key];
+      var grp=groups[key];
       if (!grp.length) return;
-      var sideSign = key === 'pos' ? 1 : -1;
-
-      /* Known brands first, then by along */
-      grp.sort(function(a,b){ return a.hasLogo !== b.hasLogo ? (a.hasLogo?-1:1) : a.along-b.along; });
-      grp = grp.slice(0, MAX_PER_SIDE);
-      grp.sort(function(a,b){ return a.along - b.along; });  /* restore geo order */
-
-      /* Center slots near the visible mid-point of the street */
-      var n = grp.length;
-      var avgAlong = grp.reduce(function(s,x){return s+x.along;},0) / n;
-      /* Clamp so group stays inside canvas along this street */
-      var halfSpan = (n-1) * SLOT_W / 2;
-      var safe = diag/2 - LOGO_W/2 - 10;
-      avgAlong = Math.max(-safe+halfSpan, Math.min(safe-halfSpan, avgAlong));
-
-      grp.forEach(function(item, idx) {
-        var slotAlong = avgAlong + (idx - (n-1)/2) * SLOT_W;
-        var lx = m.cx + slotAlong*cosA + sideSign*LOGO_OFF*nx;
-        var ly = m.cy + slotAlong*sinA + sideSign*LOGO_OFF*ny;
-        lx = Math.max(LOGO_W/2+6, Math.min(W-LOGO_W/2-6, lx));
-        ly = Math.max(LOGO_H/2+76, Math.min(H-LOGO_H/2-6, ly));
-
-        /* Skip if overlaps any already-placed logo */
-        var overlap = allPlaced.some(function(q){
-          return Math.abs(lx-q._lx) < LOGO_W+4 && Math.abs(ly-q._ly) < LOGO_H+4;
-        });
+      var sideSign=key==='pos'?1:-1;
+      grp.sort(function(a,b){return a.hasLogo!==b.hasLogo?(a.hasLogo?-1:1):a.along-b.along;});
+      grp=grp.slice(0,MAX_PER_SIDE);
+      grp.sort(function(a,b){return a.along-b.along;});
+      var n=grp.length;
+      var avgAlong=grp.reduce(function(s,x){return s+x.along;},0)/n;
+      var halfSpan=(n-1)*SLOT_W/2;
+      var safe=diag/2-LOGO_W/2-10;
+      avgAlong=Math.max(-safe+halfSpan,Math.min(safe-halfSpan,avgAlong));
+      grp.forEach(function(item,idx) {
+        var slotAlong=avgAlong+(idx-(n-1)/2)*SLOT_W;
+        var lx=m.cx+slotAlong*cosA+sideSign*LOGO_OFF*nx;
+        var ly=m.cy+slotAlong*sinA+sideSign*LOGO_OFF*ny;
+        lx=Math.max(LOGO_W/2+6,Math.min(W-LOGO_W/2-6,lx));
+        ly=Math.max(LOGO_H/2+76,Math.min(H-LOGO_H/2-6,ly));
+        var overlap=allPlaced.some(function(q){return Math.abs(lx-q._lx)<LOGO_W+4&&Math.abs(ly-q._ly)<LOGO_H+4;});
         if (overlap) return;
-
-        item.p._lx = lx; item.p._ly = ly;
+        item.p._lx=lx; item.p._ly=ly;
         allPlaced.push(item.p);
       });
     });
   });
 
-  /* ── 3b. RENDER LOGOS ──────────────────────────────────── */
   allPlaced.forEach(function(p) {
-    var lx = p._lx, ly = p._ly;
+    var lx=p._lx, ly=p._ly;
     if (p.logo) {
-      s.push('<rect x="'+(lx-LOGO_W/2-2).toFixed(0)+'" y="'+(ly-LOGO_H/2-2).toFixed(0)
-        +'" width="'+(LOGO_W+4)+'" height="'+(LOGO_H+4)
-        +'" rx="7" fill="white" stroke="#ddd" stroke-width="1.5"/>');
-      s.push('<foreignObject x="'+(lx-LOGO_W/2).toFixed(0)+'" y="'+(ly-LOGO_H/2).toFixed(0)
-        +'" width="'+LOGO_W+'" height="'+LOGO_H+'">');
-      s.push('<div xmlns="http://www.w3.org/1999/xhtml"'
-        +' style="width:'+LOGO_W+'px;height:'+LOGO_H+'px;display:flex;'
-        +'align-items:center;justify-content:center;overflow:hidden;">');
-      s.push('<img src="'+escH(p.logo)+'" alt="'+escH(p.name)+'" title="'+escH(p.name)+'"'
-        +' style="max-height:'+(LOGO_H-10)+'px;max-width:'+(LOGO_W-10)+'px;object-fit:contain;"'
-        +' onerror="svgLogoErr(this)"/>');
+      s.push('<rect x="'+(lx-LOGO_W/2-2).toFixed(0)+'" y="'+(ly-LOGO_H/2-2).toFixed(0)+'" width="'+(LOGO_W+4)+'" height="'+(LOGO_H+4)+'" rx="7" fill="white" stroke="#ddd" stroke-width="1.5"/>');
+      s.push('<foreignObject x="'+(lx-LOGO_W/2).toFixed(0)+'" y="'+(ly-LOGO_H/2).toFixed(0)+'" width="'+LOGO_W+'" height="'+LOGO_H+'">');
+      s.push('<div xmlns="http://www.w3.org/1999/xhtml" style="width:'+LOGO_W+'px;height:'+LOGO_H+'px;display:flex;align-items:center;justify-content:center;overflow:hidden;">');
+      s.push('<img src="'+escH(p.logo)+'" alt="'+escH(p.name)+'" title="'+escH(p.name)+'" style="max-height:'+(LOGO_H-10)+'px;max-width:'+(LOGO_W-10)+'px;object-fit:contain;" onerror="svgLogoErr(this)"/>');
       s.push('</div></foreignObject>');
+      var nameLabel=p.name.length>22?p.name.slice(0,20)+'..':p.name;
+      s.push('<rect x="'+(lx-LOGO_W/2).toFixed(0)+'" y="'+(ly+LOGO_H/2+2).toFixed(0)+'" width="'+LOGO_W+'" height="16" rx="3" fill="rgba(255,255,255,0.92)"/>');
+      s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+LOGO_H/2+13).toFixed(0)+'" text-anchor="middle" fill="#222" font-family="Arial,sans-serif" font-size="9.5" font-weight="700">'+escH(nameLabel)+'</text>');
     } else {
-      var label = p.name.length > 20 ? p.name.slice(0,18)+'..' : p.name;
-      var lw = Math.min(label.length * 7.5 + 20, LOGO_W);
-      s.push('<rect x="'+(lx-lw/2).toFixed(0)+'" y="'+(ly-16).toFixed(0)
-        +'" width="'+lw+'" height="32" rx="5"'
-        +' fill="white" stroke="#bbb" stroke-width="1.5"/>');
-      s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+5).toFixed(0)+'" text-anchor="middle"'
-        +' fill="#333" font-family="Arial,sans-serif" font-size="11" font-weight="700">'+escH(label)+'</text>');
+      var label=p.name.length>20?p.name.slice(0,18)+'..':p.name;
+      var lw=Math.min(label.length*7.5+20,LOGO_W);
+      s.push('<rect x="'+(lx-lw/2).toFixed(0)+'" y="'+(ly-16).toFixed(0)+'" width="'+lw+'" height="32" rx="5" fill="white" stroke="#bbb" stroke-width="1.5"/>');
+      s.push('<text x="'+lx.toFixed(0)+'" y="'+(ly+5).toFixed(0)+'" text-anchor="middle" fill="#333" font-family="Arial,sans-serif" font-size="11" font-weight="700">'+escH(label)+'</text>');
     }
   });
 
-  /* ── 4b. STREET LABELS — drawn last, always on top ─────── */
   metas.forEach(function(m) {
-    var deg = (m.ang * 180 / Math.PI).toFixed(3);
-    var lx  = (m.cx + diag * 0.28).toFixed(1);
-    var ly  = m.cy.toFixed(1);
-    s.push('<text x="'+lx+'" y="'+ly+'"'
-      +' transform="rotate('+deg+','+m.cx.toFixed(1)+','+m.cy.toFixed(1)+')"'
-      +' text-anchor="middle" dominant-baseline="middle"'
-      +' fill="white" font-family="Arial,sans-serif" font-size="13"'
-      +' font-weight="900" letter-spacing="4">'+escH(m.name.toUpperCase())+'</text>');
+    if (!m.isCrossing) return;
+    var deg=(m.ang*180/Math.PI).toFixed(3);
+    var lx=(m.cx+diag*0.28).toFixed(1);
+    var ly=m.cy.toFixed(1);
+    s.push('<text x="'+lx+'" y="'+ly+'" transform="rotate('+deg+','+m.cx.toFixed(1)+','+m.cy.toFixed(1)+')" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial,sans-serif" font-size="13" font-weight="900" letter-spacing="4">'+escH(m.name.toUpperCase())+'</text>');
   });
 
-  /* 4. Header overlay */
-  var parts  = data.formatted_address.split(',');
-  var addrL1 = (parts[0] || '').trim().toUpperCase();
-  var addrL2 = parts.slice(-2).join(',').trim().toUpperCase();
+  var parts=data.formatted_address.split(',');
+  var addrL1=(parts[0]||'').trim().toUpperCase();
+  var addrL2=parts.slice(-2).join(',').trim().toUpperCase();
 
   s.push('<rect x="0" y="0" width="'+W+'" height="72" fill="rgba(255,255,255,0.95)"/>');
   s.push('<rect x="0" y="0" width="'+W+'" height="72" fill="none" stroke="#eee" stroke-width="1"/>');
-
-  /* Gordoniz cube logo */
   s.push('<g transform="translate(14,12)">');
   s.push('<polygon points="24,2 44,12 44,26 24,36 4,26 4,12" fill="#e8f0f8"/>');
   s.push('<polygon points="24,2 44,12 24,22 4,12" fill="#2E6B9E"/>');
   s.push('<polygon points="4,12 24,22 24,36 4,26" fill="#1A3C5E"/>');
   s.push('<polygon points="44,12 24,22 24,36 44,26" fill="#3A8FCC"/>');
   s.push('</g>');
-  s.push('<text x="68" y="30" font-family="Arial,sans-serif" font-size="16"'
-    +' font-weight="900" fill="#1A3C5E" letter-spacing="1.5">GORDONIZ</text>');
-  s.push('<text x="68" y="48" font-family="Arial,sans-serif" font-size="7.5" letter-spacing="1">'
-    +'<tspan fill="#888">SERVICIOS </tspan>'
-    +'<tspan fill="#E8A020" font-weight="700">INMOBILIARIOS</tspan></text>');
-
-  /* KEY PLAN title — centered */
-  s.push('<text x="'+(W/2)+'" y="26" text-anchor="middle" font-family="Arial,sans-serif"'
-    +' font-size="15" font-weight="700" fill="#111" letter-spacing="3"'
-    +' text-decoration="underline">KEY PLAN</text>');
-  s.push('<text x="'+(W/2)+'" y="46" text-anchor="middle" font-family="Arial,sans-serif"'
-    +' font-size="12" font-weight="600" fill="#222">'+escH(addrL1)+'</text>');
-  s.push('<text x="'+(W/2)+'" y="62" text-anchor="middle" font-family="Arial,sans-serif"'
-    +' font-size="10" fill="#555">'+escH(addrL2)+'</text>');
-
+  s.push('<text x="68" y="30" font-family="Arial,sans-serif" font-size="16" font-weight="900" fill="#1A3C5E" letter-spacing="1.5">GORDONIZ</text>');
+  s.push('<text x="68" y="48" font-family="Arial,sans-serif" font-size="7.5" letter-spacing="1"><tspan fill="#888">SERVICIOS </tspan><tspan fill="#E8A020" font-weight="700">INMOBILIARIOS</tspan></text>');
+  s.push('<text x="'+(W/2)+'" y="26" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#111" letter-spacing="3" text-decoration="underline">KEY PLAN</text>');
+  s.push('<text x="'+(W/2)+'" y="46" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="600" fill="#222">'+escH(addrL1)+'</text>');
+  s.push('<text x="'+(W/2)+'" y="62" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" fill="#555">'+escH(addrL2)+'</text>');
   s.push('</svg>');
 
-  container.innerHTML = s.join('');
+  container.innerHTML=s.join('');
   document.getElementById('status').classList.remove('visible');
   document.getElementById('keyplan-container').classList.add('visible');
-  document.getElementById('btn-export').style.display = 'inline-block';
-  document.getElementById('btn-map').style.display = 'inline-block';
-  document.getElementById('map-container').style.display = 'none';
-  if (window._leafletMap) { window._leafletMap.remove(); window._leafletMap = null; }
+  document.getElementById('btn-export').style.display='inline-block';
+  document.getElementById('btn-map').style.display='inline-block';
+  document.getElementById('map-container').style.display='none';
+  if (window._leafletMap){window._leafletMap.remove();window._leafletMap=null;}
 }
 
-/* Called by onerror inside foreignObject */
 function svgLogoErr(img) {
-  /* Replace with text label */
-  var name = img.alt || '';
-  var label = name.length > 18 ? name.slice(0,16)+'..' : name;
-  var fo = img.closest ? img.closest('foreignObject') : null;
-  if (!fo) { img.style.display='none'; return; }
-  var svgEl = fo.closest ? fo.closest('svg') : null;
-  if (!svgEl) { img.style.display='none'; return; }
-  var x = parseFloat(fo.getAttribute('x')) + 54;
-  var y = parseFloat(fo.getAttribute('y')) + 16;
-  var rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
-  rect.setAttribute('x', x - 54);
-  rect.setAttribute('y', y);
-  rect.setAttribute('width','108');
-  rect.setAttribute('height','32');
-  rect.setAttribute('rx','3');
-  rect.setAttribute('fill','white');
-  rect.setAttribute('stroke','#ccc');
-  var txt = document.createElementNS('http://www.w3.org/2000/svg','text');
-  txt.setAttribute('x', x);
-  txt.setAttribute('y', y + 21);
-  txt.setAttribute('text-anchor','middle');
-  txt.setAttribute('fill','#333');
-  txt.setAttribute('font-family','Arial,sans-serif');
-  txt.setAttribute('font-size','9.5');
-  txt.setAttribute('font-weight','700');
-  txt.textContent = label;
-  svgEl.appendChild(rect);
-  svgEl.appendChild(txt);
-  fo.style.display = 'none';
+  var name=img.alt||'';
+  var label=name.length>18?name.slice(0,16)+'..':name;
+  var fo=img.closest?img.closest('foreignObject'):null;
+  if(!fo){img.style.display='none';return;}
+  var svgEl=fo.closest?fo.closest('svg'):null;
+  if(!svgEl){img.style.display='none';return;}
+  var x=parseFloat(fo.getAttribute('x'))+54;
+  var y=parseFloat(fo.getAttribute('y'))+16;
+  var rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  rect.setAttribute('x',x-54);rect.setAttribute('y',y);
+  rect.setAttribute('width','108');rect.setAttribute('height','32');
+  rect.setAttribute('rx','3');rect.setAttribute('fill','white');rect.setAttribute('stroke','#ccc');
+  var txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+  txt.setAttribute('x',x);txt.setAttribute('y',y+21);
+  txt.setAttribute('text-anchor','middle');txt.setAttribute('fill','#333');
+  txt.setAttribute('font-family','Arial,sans-serif');txt.setAttribute('font-size','9.5');txt.setAttribute('font-weight','700');
+  txt.textContent=label;
+  svgEl.appendChild(rect);svgEl.appendChild(txt);
+  fo.style.display='none';
 }
 
-/* MAP */
 function toggleMap() {
-  var mapDiv = document.getElementById('map-container');
-  var btn = document.getElementById('btn-map');
-  if (mapDiv.style.display !== 'block') {
-    mapDiv.style.display = 'block'; btn.textContent = 'X Cerrar Mapa'; initMap(lastData);
+  var mapDiv=document.getElementById('map-container');
+  var btn=document.getElementById('btn-map');
+  if(mapDiv.style.display!=='block'){
+    mapDiv.style.display='block';btn.textContent='X Cerrar Mapa';initMap(lastData);
   } else {
-    mapDiv.style.display = 'none'; btn.textContent = 'Ver Mapa';
-    if (window._leafletMap) { window._leafletMap.remove(); window._leafletMap = null; }
+    mapDiv.style.display='none';btn.textContent='Ver Mapa';
+    if(window._leafletMap){window._leafletMap.remove();window._leafletMap=null;}
   }
 }
 
 function initMap(data) {
-  if (!data) return;
-  if (window._leafletMap) { window._leafletMap.remove(); window._leafletMap = null; }
-  var map = L.map('map').setView([data.lat, data.lng], 17);
-  window._leafletMap = map;
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:21
-  }).addTo(map);
-  L.circle([data.lat, data.lng], {
-    radius: data.radius, color:'#1A3C5E', fillColor:'#1A3C5E', fillOpacity:0.06, weight:2
-  }).addTo(map);
+  if(!data)return;
+  if(window._leafletMap){window._leafletMap.remove();window._leafletMap=null;}
+  var map=L.map('map').setView([data.lat,data.lng],17);
+  window._leafletMap=map;
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:21}).addTo(map);
+  L.circle([data.lat,data.lng],{radius:data.radius,color:'#1A3C5E',fillColor:'#1A3C5E',fillOpacity:0.06,weight:2}).addTo(map);
   var pinHtml='<div style="background:#E8A020;color:white;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:800;border:2px solid white;">LOCAL</div>';
-  L.marker([data.lat,data.lng], {
-    icon: L.divIcon({className:'',html:pinHtml,iconAnchor:[30,0]}), zIndexOffset:1000
-  }).addTo(map).bindPopup('<b>'+escH(data.formatted_address)+'</b>');
-  data.streets.forEach(function(st) {
-    st.places.forEach(function(p) {
-      if (!p.lat || !p.lng) return;
-      var nm = p.name.length>22 ? p.name.slice(0,20)+'..' : p.name;
+  L.marker([data.lat,data.lng],{icon:L.divIcon({className:'',html:pinHtml,iconAnchor:[30,0]}),zIndexOffset:1000}).addTo(map).bindPopup('<b>'+escH(data.formatted_address)+'</b>');
+  data.streets.forEach(function(st){
+    st.places.forEach(function(p){
+      if(!p.lat||!p.lng)return;
+      var nm=p.name.length>22?p.name.slice(0,20)+'..':p.name;
       var h='<div style="background:white;border:2px solid #1A3C5E;padding:3px 8px;border-radius:16px;font-size:11px;font-weight:700;white-space:nowrap;">'+nm+'</div>';
-      L.marker([p.lat,p.lng], {icon: L.divIcon({className:'',html:h,iconAnchor:[0,12]})})
-        .addTo(map).bindPopup('<b>'+escH(p.name)+'</b><br><small>'+escH(p.vicinity||'')+'</small>');
+      L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:h,iconAnchor:[0,12]})}).addTo(map).bindPopup('<b>'+escH(p.name)+'</b><br><small>'+escH(p.vicinity||'')+'</small>');
     });
   });
 }
 
-document.addEventListener('keydown', function(e){ if(e.key==='Enter') generate(); });
+document.addEventListener('keydown',function(e){if(e.key==='Enter')generate();});
 </script>
 </body>
-</html>
+    </html>
