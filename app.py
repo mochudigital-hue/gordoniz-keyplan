@@ -14,6 +14,7 @@ import requests
 import time
 import re
 import os
+import unicodedata
 from collections import defaultdict
 
 app = Flask(__name__)
@@ -154,6 +155,22 @@ def place_category(types):
     return "Otros"
 
 
+# Índice de logos locales
+def _norm(s):
+    s = s.lower()
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^a-z0-9]", "", s)
+
+_LOGO_DIR = os.path.join(os.path.dirname(__file__), "static", "logos")
+LOCAL_LOGOS = {}
+if os.path.isdir(_LOGO_DIR):
+    for _f in os.listdir(_LOGO_DIR):
+        if _f.lower().endswith(".png"):
+            _key = _f.rsplit(".", 1)[0].rsplit("_", 1)[0]
+            LOCAL_LOGOS[_norm(_key)] = _f
+
+
 BRAND_DOMAINS = {
     'zara': 'zara.com', 'mango': 'mango.com', 'bershka': 'bershka.com',
     'stradivarius': 'stradivarius.com', 'pull&bear': 'pullandbear.com',
@@ -216,7 +233,7 @@ BRAND_DOMAINS = {
     'kutxabank': 'kutxabank.es', 'ibercaja': 'ibercaja.es', 'openbank': 'openbank.es',
     'generali': 'generali.es', 'allianz': 'allianz.es',
     # Restaurantes / cafes
-    'viena capellanes': 'vienacapellanes.com', 'lizarrán': 'lizarran.es',
+    'viena capellanes': 'vienacapellanes.com', 'lizarran': 'lizarran.es',
     'la tagliatella': 'latagliatella.es', 'goiko': 'goiko.com',
     'five guys': 'fiveguys.com', 'vips': 'vips.es',
     'grosso napoletano': 'grossonapoletano.com', 'lateral': 'lateral.es',
@@ -260,20 +277,23 @@ BRAND_DOMAINS = {
     'christian louboutin': 'christianlouboutin.com', 'louboutin': 'christianlouboutin.com',
     'jimmy choo': 'jimmychoo.com', 'aquazzura': 'aquazzura.com',
     'stuart weitzman': 'stuartweitzman.com',
-    # Restaurantes zona Serrano
     'ten con ten': 'tenconten.es',
     'amazonia': 'restauranteamazonia.es',
     'lateral': 'lateral.es',
-    # Optica zona
     'optica serrano': 'opticaserrano.com',
-    # Joyeria
     'carrera y carrera': 'carreraycarrera.com',
     'rabat': 'rabat.es',
 }
 
 def logo_url(name):
-    """Logo via Google faviconV2. Solo para marcas reconocidas en BRAND_DOMAINS."""
+    """Busca logo: 1 local static/logos, 2 Google faviconV2."""
     name_lower = name.lower().strip()
+    name_norm  = _norm(name)
+    if name_norm in LOCAL_LOGOS:
+        return "/static/logos/" + LOCAL_LOGOS[name_norm]
+    for key, fname in LOCAL_LOGOS.items():
+        if key and len(key) >= 4 and key in name_norm:
+            return "/static/logos/" + fname
     for brand, domain in BRAND_DOMAINS.items():
         if brand in name_lower:
             return (
@@ -281,8 +301,40 @@ def logo_url(name):
                 f"?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL"
                 f"&url=https://{domain}&size=128"
             )
-    # Marcas desconocidas → texto limpio (sin favicon aleatorio)
     return ""
+
+
+_WEBSITE_CACHE = {}
+
+def get_place_website(place_id, api_key):
+    """Llama a Place Details para obtener el website del negocio."""
+    if not place_id or not api_key:
+        return ""
+    if place_id in _WEBSITE_CACHE:
+        return _WEBSITE_CACHE[place_id]
+    try:
+        r = requests.get(
+            "https://maps.googleapis.com/maps/api/place/details/json",
+            params={"place_id": place_id, "fields": "website", "key": api_key},
+            timeout=5
+        )
+        website = r.json().get("result", {}).get("website", "")
+    except Exception:
+        website = ""
+    _WEBSITE_CACHE[place_id] = website
+    return website
+
+def favicon_from_url(website):
+    if not website:
+        return ""
+    domain = re.sub(r"^https?://", "", website).split("/")[0].lstrip("www.")
+    if not domain:
+        return ""
+    return (
+        f"https://t2.gstatic.com/faviconV2"
+        f"?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL"
+        f"&url=https://{domain}&size=128"
+    )
 
 
 @app.route("/api/config")
@@ -296,7 +348,6 @@ def index():
     template_path = os.path.join(os.path.dirname(__file__), 'templates', 'index.html')
     with open(template_path, 'r', encoding='utf-8') as f:
         html = f.read()
-    # Ocultar campo de API key si el servidor ya tiene la key configurada
     if SERVER_API_KEY:
         html = html.replace(
             'id="apikey-group">',
@@ -322,7 +373,6 @@ def keyplan():
 
     places = nearby_places(lat, lng, radius, api_key)
 
-    # Solo negocios a pie de calle: excluir alojamiento y tipos no comerciales
     EXCLUIR_TIPOS = {
         'lodging', 'real_estate_agency', 'insurance_agency',
         'lawyer', 'accounting', 'embassy', 'local_government_office',
@@ -359,21 +409,20 @@ def keyplan():
             "types": p.get("types", []),
             "color": place_color(p.get("types", [])),
             "category": place_category(p.get("types", [])),
-            "logo": logo_url(p.get("name", "")),
+            "logo": logo_url(p.get("name", "")) or favicon_from_url(
+                get_place_website(p.get("place_id"), api_key)
+            ),
             "open": p.get("opening_hours", {}).get("open_now"),
             "vicinity": p.get("vicinity", ""),
             "lat": p.get("geometry", {}).get("location", {}).get("lat"),
             "lng": p.get("geometry", {}).get("location", {}).get("lng"),
         })
 
-    # Determinar calle objetivo (la calle del inmueble)
     target_street = extract_street(formatted.split(",")[0])
 
-    # Ordenar calles por nº de negocios, limitar
     max_streets = 8 if radius <= 300 else (14 if radius <= 800 else 20)
     streets_sorted = sorted(by_street.items(), key=lambda x: -len(x[1]))[:max_streets]
 
-    # Limitar a 6 negocios por calle (los más valorados)
     def top_places(ps):
         return sorted(ps, key=lambda p: -(p.get("rating") or 0))[:6]
 
