@@ -16,6 +16,7 @@ import re
 import os
 import unicodedata
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = Flask(__name__)
 
@@ -288,6 +289,25 @@ BRAND_DOMAINS = {
     'rabat': 'rabat.es',
 }
 
+def get_photo_cdn(ref, api_key):
+    """Sigue el redirect de Google Places Photo y devuelve la URL CDN directa."""
+    if not ref or not api_key:
+        return ''
+    try:
+        r = requests.get(
+            "https://maps.googleapis.com/maps/api/place/photo",
+            params={"maxwidth": 100, "photo_reference": ref, "key": api_key},
+            allow_redirects=False,
+            timeout=5
+        )
+        loc = r.headers.get("Location", "")
+        if loc and ("googleusercontent" in loc or "ggpht" in loc):
+            return loc
+    except Exception:
+        pass
+    return ''
+
+
 def logo_url(name):
     """Busca logo: 1 local static/logos, 2 Google faviconV2."""
     name_lower = name.lower().strip()
@@ -398,11 +418,37 @@ def keyplan():
             "category": place_category(p.get("types", [])),
             "logo": logo_url(p.get("name", "")),
             "photoRef": photo_ref,
+            "photoUrl": "",   # se rellena abajo con pre-fetch CDN
+            "icon": p.get("icon", ""),
             "open": p.get("opening_hours", {}).get("open_now"),
             "vicinity": p.get("vicinity", ""),
             "lat": p.get("geometry", {}).get("location", {}).get("lat"),
             "lng": p.get("geometry", {}).get("location", {}).get("lng"),
         })
+
+    # Pre-fetch photo CDN URLs concurrentemente (evita proxy, no expone API key)
+    photo_refs = {}
+    for ps in by_street.values():
+        for place in ps:
+            ref = place.get("photoRef", "")
+            if ref and ref not in photo_refs:
+                photo_refs[ref] = ''
+
+    if photo_refs and api_key:
+        with ThreadPoolExecutor(max_workers=20) as ex:
+            fut_map = {ex.submit(get_photo_cdn, ref, api_key): ref for ref in photo_refs}
+            for fut in as_completed(fut_map):
+                ref = fut_map[fut]
+                try:
+                    photo_refs[ref] = fut.result()
+                except Exception:
+                    pass
+
+        for ps in by_street.values():
+            for place in ps:
+                ref = place.get("photoRef", "")
+                if ref:
+                    place["photoUrl"] = photo_refs.get(ref, "")
 
     # Determinar calle objetivo (la calle del inmueble)
     target_street = extract_street(formatted.split(",")[0])
