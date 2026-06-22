@@ -545,24 +545,23 @@ function getIconSize(zoom) {
 }
 
 function bestLogoSrc(p) {
-  // 1. Logo de marca conocida (faviconV2)
+  // 1. Logo de marca conocida (faviconV2 / static)
   if (p.logo) return p.logo;
-  // 2. Foto real de Google Places via proxy del servidor
-  if (p.photoRef) return `/api/photo/${encodeURIComponent(p.photoRef)}`;
-  // 3. Clearbit: intenta adivinar dominio por nombre del negocio
-  const slug = (p.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
-  if (slug.length >= 3) return `https://logo.clearbit.com/${slug}.com`;
+  // 2. Foto real de Google Places (CDN URL pre-fetched en servidor)
+  if (p.photoUrl) return p.photoUrl;
+  // 3. Icono de categoría de Google Maps (siempre disponible)
+  if (p.icon) return p.icon;
   return '';
 }
 
 function bizIcon(p, sz) {
   const col  = p.color || '#546E7A';
   const ini  = escHtml((p.name || '?').charAt(0).toUpperCase());
-  const iSz  = Math.round(sz * 0.82);
+  const iSz  = Math.round(sz * 0.80);
   const fSz  = Math.round(sz * 0.44);
   const src  = bestLogoSrc(p);
-  // width/height fijos + object-fit:contain garantizan que el logo no se corte ni se salga
-  const imgStyle = `width:${iSz}px;height:${iSz}px;object-fit:contain;display:block;flex-shrink:0;`;
+  // max-width/max-height: el img nunca desborda, funciona con SVGs y PNGs de cualquier tamaño
+  const imgStyle = `max-width:${iSz}px;max-height:${iSz}px;width:auto;height:auto;object-fit:contain;flex-shrink:0;display:block;`;
   const inner = src
     ? `<img src="${escHtml(src)}" style="${imgStyle}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;font-size:${fSz}px;font-weight:700;color:${col};width:100%;height:100%;align-items:center;justify-content:center;">${ini}</span>`
     : `<span style="font-size:${fSz}px;font-weight:700;color:${col};">${ini}</span>`;
