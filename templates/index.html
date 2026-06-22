@@ -590,14 +590,14 @@ function sortByStreet(map, places) {
     .map(x => x.p);
 }
 
-// Calcula las posiciones en fila y el tamaño efectivo para evitar solapamientos
+// Calcula posiciones en fila con spreading 1D en la dirección de la calle.
+// Los logos se separan a lo largo de la acera para evitar solapamiento — sin encoger.
 // Devuelve { positions: LatLng[], sizes: number[] }
 function rowPositions(map, ordered, sz) {
   const n = ordered.length;
   if (n === 0) return { positions: [], sizes: [] };
   const pts = ordered.map(p => map.latLngToContainerPoint(L.latLng(p.lat, p.lng)));
 
-  // Caso especial: un solo negocio — colocarlo encima de su posición real
   if (n === 1) {
     const off = Math.round(sz * 0.45 + 4);
     return {
@@ -609,72 +609,92 @@ function rowPositions(map, ordered, sz) {
   const cx = pts.reduce((s, p) => s + p.x, 0) / n;
   const cy = pts.reduce((s, p) => s + p.y, 0) / n;
 
-  // Vector dirección de la calle (extremo a extremo)
   let ux = 1, uy = 0;
   const ddx = pts[n-1].x - pts[0].x, ddy = pts[n-1].y - pts[0].y;
-  const l = Math.sqrt(ddx*ddx + ddy*ddy);
-  if (l > 5) { ux = ddx/l; uy = ddy/l; }
+  const ll = Math.sqrt(ddx*ddx + ddy*ddy);
+  if (ll > 5) { ux = ddx/ll; uy = ddy/ll; }
 
-  // Vector perpendicular unitario: (-uy, ux)
-  const px = -uy, py = ux;
+  const pvx = -uy, pvy = ux; // vector perpendicular unitario
+  const offset = Math.round(sz * 0.45 + 4);
 
   // Proyección y lado de cada negocio
   const items = ordered.map((_, i) => {
     const dx = pts[i].x - cx, dy = pts[i].y - cy;
-    return {
-      t:    dx * ux + dy * uy,                 // posición real sobre el eje de la calle
-      side: (ux * dy - uy * dx) >= 0 ? 1 : -1 // qué acera: +1 ó -1
-    };
+    return { t: dx*ux + dy*uy, side: (ux*dy - uy*dx) >= 0 ? 1 : -1 };
   });
 
-  // Mínima distancia entre logos adyacentes del mismo lado → límite de tamaño sin solapamiento
-  let minGap = Infinity;
+  // Spreading 1D bidireccional por acera: separar logos demasiado juntos a lo largo de la calle
   [-1, 1].forEach(s => {
-    const ts = items.filter(x => x.side === s).map(x => x.t).sort((a, b) => a - b);
-    for (let i = 1; i < ts.length; i++) minGap = Math.min(minGap, ts[i] - ts[i-1]);
+    const side = items.filter(x => x.side === s).sort((a, b) => a.t - b.t);
+    if (side.length <= 1) return;
+    const ts = side.map(x => x.t);
+    for (let iter = 0; iter < 30; iter++) {
+      let moved = false;
+      for (let k = 1; k < ts.length; k++) {
+        if (ts[k] - ts[k-1] < sz) {
+          const mid = (ts[k] + ts[k-1]) / 2;
+          ts[k-1] = mid - sz/2; ts[k] = mid + sz/2; moved = true;
+        }
+      }
+      for (let k = ts.length - 2; k >= 0; k--) {
+        if (ts[k+1] - ts[k] < sz) {
+          const mid = (ts[k+1] + ts[k]) / 2;
+          ts[k] = mid - sz/2; ts[k+1] = mid + sz/2; moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    side.forEach((item, k) => { item.t = ts[k]; });
   });
-
-  // Tamaño efectivo: reducir si hay solapamiento, mínimo 16px
-  const effSz  = minGap < sz ? Math.max(16, Math.floor(minGap)) : sz;
-  const offset = Math.round(effSz * 0.45 + 4);
 
   const positions = items.map(({ t, side }) =>
     map.containerPointToLatLng([
-      cx + ux * t + px * side * offset,
-      cy + uy * t + py * side * offset
+      cx + ux*t + pvx*side*offset,
+      cy + uy*t + pvy*side*offset
     ])
   );
 
-  return { positions, sizes: Array(n).fill(effSz) };
+  return { positions, sizes: Array(n).fill(sz) };
 }
 
 // ── ANTI-SOLAPAMIENTO GLOBAL ──────────────────────────────────────────────
-// Recibe los orderedPlaces de cada calle, calcula posiciones con sz,
-// luego compara todos los marcadores entre sí para capear el tamaño display
-// SIN cambiar las posiciones (evita dependencia circular).
+// Paso 1: per-calle spreading 1D (rowPositions).
+// Paso 2: push-apart 2D entre calles distintas — desplazamiento mínimo, sin encoger iconos.
 function computeAllRows(map, rowsData, sz) {
-  // 1ª pasada: posiciones + tamaños per-calle (cubre solapamientos mismo-lado)
   const results = rowsData.map(op => rowPositions(map, op, sz));
+  const n = results.reduce((s, r) => s + r.positions.length, 0);
+  if (n <= 1) return results;
 
-  // Distancia mínima entre TODOS los marcadores del mapa
-  const allPts = results.flatMap(r =>
-    r.positions.map(ll => map.latLngToContainerPoint(ll))
+  // Posiciones en píxeles (mutables para el push-apart)
+  const pts = results.flatMap(r =>
+    r.positions.map(ll => { const p = map.latLngToContainerPoint(ll); return { x: p.x, y: p.y }; })
   );
-  let minDist = Infinity;
-  for (let i = 0; i < allPts.length; i++) {
-    for (let j = i + 1; j < allPts.length; j++) {
-      const d = Math.hypot(allPts[i].x - allPts[j].x, allPts[i].y - allPts[j].y);
-      if (d < minDist) minDist = d;
+
+  // Push-apart iterativo 2D: desplaza logos lo mínimo para eliminar solapamiento
+  for (let iter = 0; iter < 25; iter++) {
+    let maxOv = 0;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const dx = pts[j].x - pts[i].x, dy = pts[j].y - pts[i].y;
+        const d  = Math.sqrt(dx*dx + dy*dy);
+        if (d < sz) {
+          const ov = sz - d;
+          if (ov > maxOv) maxOv = ov;
+          const push = ov / 2 + 0.5;
+          const nx = d > 0.5 ? dx/d : 1, ny = d > 0.5 ? dy/d : 0;
+          pts[i].x -= nx*push; pts[i].y -= ny*push;
+          pts[j].x += nx*push; pts[j].y += ny*push;
+        }
+      }
     }
+    if (maxOv < 0.5) break;
   }
 
-  // Si hay solapamientos entre calles distintas, reducir tamaño display
-  // (las posiciones NO cambian → sin dependencia circular)
-  if (!isFinite(minDist) || minDist >= sz) return results;
-  const cap = Math.max(16, Math.floor(minDist * 0.85));
+  // Convertir de vuelta a LatLng
+  let idx = 0;
   return results.map(r => ({
-    positions: r.positions,
-    sizes: r.sizes.map(s => Math.min(s, cap))
+    positions: r.positions.map(() => map.containerPointToLatLng([pts[idx].x, pts[idx++].y])),
+    sizes: r.sizes
   }));
 }
 
