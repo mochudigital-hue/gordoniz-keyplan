@@ -541,8 +541,8 @@ function escHtml(s) {
 // ── MAPA DE NEGOCIOS ──────────────────────────────────────
 
 function getIconSize(zoom) {
-  // zoom 15→36px  16→52px  17→68px  18→80px (cap 80)
-  return Math.max(36, Math.min(80, (zoom - 13) * 16));
+  // zoom 15→30px  16→42px  17→54px  18→64px (cap 64) — más pequeño para menos solapamiento
+  return Math.max(30, Math.min(64, (zoom - 13) * 12));
 }
 
 function bestLogoSrc(p) {
@@ -576,133 +576,51 @@ function bizIcon(p, sz) {
   });
 }
 
-// ── FILAS POR CALLE ───────────────────────────────────────
+// ── POSICIONAMIENTO EXACTO + ANTI-SOLAPAMIENTO ───────────────────────────
+// Coloca cada negocio en su coordenada GPS real.
+// Solo desplaza lo mínimo imprescindible cuando dos logos se solapan.
+function computePositions(map, places, sz) {
+  if (places.length === 0) return [];
 
-// Ordena los negocios de una calle por su posición a lo largo de ella
-function sortByStreet(map, places) {
-  if (places.length <= 1) return [...places];
-  const pts = places.map(p => map.latLngToContainerPoint(L.latLng(p.lat, p.lng)));
-  const spanX = Math.max(...pts.map(p => p.x)) - Math.min(...pts.map(p => p.x));
-  const spanY = Math.max(...pts.map(p => p.y)) - Math.min(...pts.map(p => p.y));
-  return places
-    .map((p, i) => ({ p, v: spanX >= spanY ? pts[i].x : pts[i].y }))
-    .sort((a, b) => a.v - b.v)
-    .map(x => x.p);
-}
-
-// Calcula posiciones en fila con spreading 1D en la dirección de la calle.
-// Los logos se separan a lo largo de la acera para evitar solapamiento — sin encoger.
-// Devuelve { positions: LatLng[], sizes: number[] }
-function rowPositions(map, ordered, sz) {
-  const n = ordered.length;
-  if (n === 0) return { positions: [], sizes: [] };
-  const pts = ordered.map(p => map.latLngToContainerPoint(L.latLng(p.lat, p.lng)));
-
-  if (n === 1) {
-    const off = Math.round(sz * 0.45 + 4);
-    return {
-      positions: [map.containerPointToLatLng([pts[0].x, pts[0].y - off])],
-      sizes: [sz]
-    };
-  }
-
-  const cx = pts.reduce((s, p) => s + p.x, 0) / n;
-  const cy = pts.reduce((s, p) => s + p.y, 0) / n;
-
-  let ux = 1, uy = 0;
-  const ddx = pts[n-1].x - pts[0].x, ddy = pts[n-1].y - pts[0].y;
-  const ll = Math.sqrt(ddx*ddx + ddy*ddy);
-  if (ll > 5) { ux = ddx/ll; uy = ddy/ll; }
-
-  const pvx = -uy, pvy = ux; // vector perpendicular unitario
-  const offset = Math.round(sz * 0.45 + 4);
-
-  // Proyección y lado de cada negocio
-  const items = ordered.map((_, i) => {
-    const dx = pts[i].x - cx, dy = pts[i].y - cy;
-    return { t: dx*ux + dy*uy, side: (ux*dy - uy*dx) >= 0 ? 1 : -1 };
+  // Partir de las coordenadas GPS reales
+  const pts = places.map(p => {
+    const px = map.latLngToContainerPoint(L.latLng(p.lat, p.lng));
+    return { x: px.x, y: px.y };
   });
 
-  // Spreading 1D bidireccional por acera: separar logos demasiado juntos a lo largo de la calle
-  [-1, 1].forEach(s => {
-    const side = items.filter(x => x.side === s).sort((a, b) => a.t - b.t);
-    if (side.length <= 1) return;
-    const ts = side.map(x => x.t);
-    for (let iter = 0; iter < 30; iter++) {
-      let moved = false;
-      for (let k = 1; k < ts.length; k++) {
-        if (ts[k] - ts[k-1] < sz) {
-          const mid = (ts[k] + ts[k-1]) / 2;
-          ts[k-1] = mid - sz/2; ts[k] = mid + sz/2; moved = true;
-        }
-      }
-      for (let k = ts.length - 2; k >= 0; k--) {
-        if (ts[k+1] - ts[k] < sz) {
-          const mid = (ts[k+1] + ts[k]) / 2;
-          ts[k] = mid - sz/2; ts[k+1] = mid + sz/2; moved = true;
-        }
-      }
-      if (!moved) break;
-    }
-    side.forEach((item, k) => { item.t = ts[k]; });
-  });
-
-  const positions = items.map(({ t, side }) =>
-    map.containerPointToLatLng([
-      cx + ux*t + pvx*side*offset,
-      cy + uy*t + pvy*side*offset
-    ])
-  );
-
-  return { positions, sizes: Array(n).fill(sz) };
-}
-
-// ── ANTI-SOLAPAMIENTO GLOBAL ──────────────────────────────────────────────
-// Paso 1: per-calle spreading 1D (rowPositions).
-// Paso 2: push-apart 2D entre calles distintas — desplazamiento mínimo, sin encoger iconos.
-function computeAllRows(map, rowsData, sz) {
-  const results = rowsData.map(op => rowPositions(map, op, sz));
-  const n = results.reduce((s, r) => s + r.positions.length, 0);
-  if (n <= 1) return results;
-
-  // Posiciones en píxeles (mutables para el push-apart)
-  const pts = results.flatMap(r =>
-    r.positions.map(ll => { const p = map.latLngToContainerPoint(ll); return { x: p.x, y: p.y }; })
-  );
-
-  // Push-apart iterativo 2D: desplaza logos lo mínimo para eliminar solapamiento
-  for (let iter = 0; iter < 25; iter++) {
+  // Push-apart iterativo: separa solo los que se solapan, mínimo movimiento
+  for (let iter = 0; iter < 100; iter++) {
     let maxOv = 0;
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const dx = pts[j].x - pts[i].x, dy = pts[j].y - pts[i].y;
-        const d  = Math.sqrt(dx*dx + dy*dy);
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        const dx = pts[j].x - pts[i].x;
+        const dy = pts[j].y - pts[i].y;
+        const d  = Math.sqrt(dx * dx + dy * dy);
         if (d < sz) {
           const ov = sz - d;
           if (ov > maxOv) maxOv = ov;
           const push = ov / 2 + 0.5;
-          const nx = d > 0.5 ? dx/d : 1, ny = d > 0.5 ? dy/d : 0;
-          pts[i].x -= nx*push; pts[i].y -= ny*push;
-          pts[j].x += nx*push; pts[j].y += ny*push;
+          const nx = d > 0.5 ? dx / d : 1;
+          const ny = d > 0.5 ? dy / d : 0;
+          pts[i].x -= nx * push;
+          pts[i].y -= ny * push;
+          pts[j].x += nx * push;
+          pts[j].y += ny * push;
         }
       }
     }
     if (maxOv < 0.5) break;
   }
 
-  // Convertir de vuelta a LatLng
-  let idx = 0;
-  return results.map(r => ({
-    positions: r.positions.map(() => map.containerPointToLatLng([pts[idx].x, pts[idx++].y])),
-    sizes: r.sizes
-  }));
+  return pts.map(p => map.containerPointToLatLng([p.x, p.y]));
 }
 
-let _rows = []; // { orderedPlaces, markers }
+let _allPlaces  = []; // todos los negocios con lat/lng
+let _allMarkers = []; // marcadores correspondientes
 
 function initBusinessMap(data) {
   if (window._bizMap) { window._bizMap.remove(); window._bizMap = null; }
-  _rows = [];
+  _allPlaces = []; _allMarkers = [];
 
   const map = L.map('biz-map', {
     zoomControl: true,
@@ -717,17 +635,13 @@ function initBusinessMap(data) {
   map.getPane('labels').style.zIndex = 650;
   map.getPane('labels').style.pointerEvents = 'none';
 
-  // Fondo blanco puro para el mapa
-  document.getElementById('biz-map').style.background = '#ffffff';
-
-  // Stamen Toner Lines: SOLO líneas de calles en negro sobre blanco — sin edificios, sin rellenos, sin ruido
-  L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_toner_lines/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, tileSize: 512, zoomOffset: -1, opacity: 1
-  }).addTo(map);
-  L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_toner_labels/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, tileSize: 512, zoomOffset: -1, pane: 'labels',
-    attribution: '© <a href="https://stamen.com">Stamen</a> © <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-  }).addTo(map);
+  // IGN Base Todo — cartografía oficial española: edificios, parcelas, calles, portales
+  L.tileLayer(
+    'https://www.ign.es/wmts/ign-base?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
+    '&LAYER=IGNBaseTodo&TILEMATRIXSET=GoogleMapsCompatible' +
+    '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/jpeg',
+    { maxZoom: 20, attribution: '© <a href="https://www.ign.es">IGN España</a>' }
+  ).addTo(map);
 
   // Pin del local buscado
   L.marker([data.lat, data.lng], {
@@ -739,43 +653,33 @@ function initBusinessMap(data) {
     zIndexOffset: 2000
   }).addTo(map).bindPopup(`<b>${escHtml(data.formatted_address)}</b>`);
 
-  const sz0 = getIconSize(map.getZoom());
-
-  // Recoger orderedPlaces por cada calle
-  const streetOrders = [];
+  // Recoger todos los negocios válidos (posición GPS real)
+  _allPlaces  = [];
+  _allMarkers = [];
   data.streets.forEach(street => {
-    const valid = street.places.filter(p => p.lat && p.lng);
-    if (!valid.length) return;
-    streetOrders.push(sortByStreet(map, valid));
+    street.places.filter(p => p.lat && p.lng).forEach(p => _allPlaces.push(p));
   });
 
-  // Layout global anti-solapamiento
-  const rowResults = computeAllRows(map, streetOrders, sz0);
+  const sz0 = getIconSize(map.getZoom());
+  const pos0 = computePositions(map, _allPlaces, sz0);
 
-  streetOrders.forEach((ordered, ri) => {
-    const { positions, sizes: szArr } = rowResults[ri];
-    const markers = ordered.map((place, i) => {
-      const m = L.marker(positions[i], { icon: bizIcon(place, szArr[i]), zIndexOffset: 100 }).addTo(map);
-      m._place = place;
-      const rH = place.rating ? `<div style="margin-top:4px;font-size:11px;">⭐ ${place.rating.toFixed(1)} (${place.reviews} reseñas)</div>` : '';
-      const oH = place.open === true  ? `<div style="color:#4CAF50;font-size:11px;margin-top:2px;">● Abierto</div>`
-               : place.open === false ? `<div style="color:#f44336;font-size:11px;margin-top:2px;">● Cerrado</div>` : '';
-      m.bindPopup(`<div style="min-width:160px"><b style="font-size:13px">${escHtml(place.name)}</b><div style="color:#888;font-size:10px;margin-top:2px">${escHtml(place.category)}</div>${rH}${oH}</div>`, { maxWidth: 200 });
-      return m;
-    });
-    _rows.push({ orderedPlaces: ordered, markers });
+  _allPlaces.forEach((place, i) => {
+    const m = L.marker(pos0[i], { icon: bizIcon(place, sz0), zIndexOffset: 100 }).addTo(map);
+    m._place = place;
+    const rH = place.rating ? `<div style="margin-top:4px;font-size:11px;">⭐ ${place.rating.toFixed(1)} (${place.reviews} reseñas)</div>` : '';
+    const oH = place.open === true  ? `<div style="color:#4CAF50;font-size:11px;margin-top:2px;">● Abierto</div>`
+             : place.open === false ? `<div style="color:#f44336;font-size:11px;margin-top:2px;">● Cerrado</div>` : '';
+    m.bindPopup(`<div style="min-width:160px"><b style="font-size:13px">${escHtml(place.name)}</b><div style="color:#888;font-size:10px;margin-top:2px">${escHtml(place.category)}</div>${rH}${oH}</div>`, { maxWidth: 200 });
+    _allMarkers.push(m);
   });
 
-  // En cada zoom/rotación: recalcular con anti-solapamiento global
+  // En cada zoom/rotación: recalcular desde coordenadas GPS exactas
   const recalc = () => {
-    const sz = getIconSize(map.getZoom());
-    const results = computeAllRows(map, _rows.map(r => r.orderedPlaces), sz);
-    _rows.forEach((row, ri) => {
-      const { positions: pos, sizes: szArr } = results[ri];
-      row.markers.forEach((m, i) => {
-        m.setLatLng(pos[i]);
-        m.setIcon(bizIcon(row.orderedPlaces[i], szArr[i]));
-      });
+    const sz  = getIconSize(map.getZoom());
+    const pos = computePositions(map, _allPlaces, sz);
+    _allMarkers.forEach((m, i) => {
+      m.setLatLng(pos[i]);
+      m.setIcon(bizIcon(_allPlaces[i], sz));
     });
   };
 
