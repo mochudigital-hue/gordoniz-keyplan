@@ -717,13 +717,13 @@ function initBusinessMap(data) {
   map.getPane('labels').style.zIndex = 650;
   map.getPane('labels').style.pointerEvents = 'none';
 
-  // Stamen Toner: fondo blanco + calles negras muy gruesas (2 colores, estilo plano esquemático)
-  L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_toner_background/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, tileSize: 512, zoomOffset: -1, opacity: 1
+  // CartoDB Positron: estilo guía turística — bloques gris claro, calles blancas con borde, nombres en negro
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd', maxZoom: 20, tileSize: 512, zoomOffset: -1, opacity: 1
   }).addTo(map);
-  L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_toner_labels/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, tileSize: 512, zoomOffset: -1, pane: 'labels',
-    attribution: '© <a href="https://stamen.com">Stamen</a> © <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd', maxZoom: 20, tileSize: 512, zoomOffset: -1, pane: 'labels',
+    attribution: '© <a href="https://carto.com">CARTO</a> © <a href="https://www.openstreetmap.org/copyright">OSM</a>'
   }).addTo(map);
 
   // Pin del local buscado
