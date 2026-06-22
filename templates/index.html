@@ -6,6 +6,7 @@
 <title>Key Plan — Gordoniz Servicios Inmobiliarios</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #222; }
@@ -610,11 +611,13 @@ function rowPositions(map, ordered, sz) {
   if (ny > 0) { nx = -nx; ny = -ny; }
   if (nx === 0 && ny === 0) { nx = 0; ny = -1; }
 
-  const step   = sz + 3;                    // separación entre logos
-  const offset = Math.round(sz * 0.45 + 4); // distancia al borde de la calle
+  const offset = Math.round(sz * 0.45 + 4); // distancia perpendicular al borde de la calle
 
+  // Cada logo en su posición REAL a lo largo de la calle (proyectada sobre el eje de la calle),
+  // pero todos a la misma distancia perpendicular. Se permiten solapamientos.
   return ordered.map((_, i) => {
-    const t = (i - (n - 1) / 2) * step;
+    const dx = pts[i].x - cx, dy = pts[i].y - cy;
+    const t = dx * ux + dy * uy; // posición real del negocio proyectada sobre el eje de la calle
     return map.containerPointToLatLng([cx + ux*t + nx*offset, cy + uy*t + ny*offset]);
   });
 }
@@ -625,7 +628,12 @@ function initBusinessMap(data) {
   if (window._bizMap) { window._bizMap.remove(); window._bizMap = null; }
   _rows = [];
 
-  const map = L.map('biz-map', { zoomControl: true }).setView([data.lat, data.lng], 17);
+  const map = L.map('biz-map', {
+    zoomControl: true,
+    rotate: true,
+    bearing: 0,
+    rotateControl: { closeOnZeroBearing: false }
+  }).setView([data.lat, data.lng], 17);
   window._bizMap = map;
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
@@ -681,8 +689,30 @@ function initBusinessMap(data) {
     });
   };
 
-  map.on('zoomend', recalc);
+  map.on('zoomend rotate', recalc);
   map.whenReady(() => setTimeout(recalc, 150));
+
+  // Rotar con botón derecho + arrastrar
+  if (map.setBearing) {
+    let _rotDrag = null;
+    map.getContainer().addEventListener('mousedown', ev => {
+      if (ev.button !== 2) return;
+      ev.preventDefault();
+      _rotDrag = { x: ev.clientX, b0: map.getBearing() };
+      const onMove = e => {
+        if (!_rotDrag) return;
+        map.setBearing(_rotDrag.b0 + (e.clientX - _rotDrag.x) * 0.5);
+      };
+      const onUp = () => {
+        _rotDrag = null;
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    map.getContainer().addEventListener('contextmenu', e => e.preventDefault());
+  }
 }
 
 // Enter para generar
