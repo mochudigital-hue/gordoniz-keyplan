@@ -538,15 +538,6 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function shortName(name) {
-  if (!name) return '?';
-  const words = name.trim().split(/\s+/);
-  if (name.length <= 9) return name;
-  const sig = words.filter(w => w.length > 2);
-  if (sig.length >= 2) return sig[0].slice(0,6) + '\n' + sig[1].slice(0,5);
-  return words[0].slice(0,7);
-}
-
 // ── CITYMAPS-STYLE MAP ────────────────────────────────────
 // Arquitectura: polígonos de edificios (Overpass) + logo dentro del edificio
 
@@ -602,33 +593,23 @@ async function fetchBuildings(lat, lng, radius) {
 
 function buildingIcon(p, sz) {
   const col  = p.color || '#546E7A';
-  const logo = p.logo || (p.photoRef ? `/api/photo/${encodeURIComponent(p.photoRef)}` : '');
-  const pad  = Math.max(3, Math.round(sz * 0.1));
+  const ini  = escHtml((p.name || '?').charAt(0).toUpperCase());
+  const fSz  = Math.round(sz * 0.42);
+  const pad  = Math.round(sz * 0.08);
+  const src  = p.logo || '';
 
-  if (logo) {
-    const fSz = Math.round(sz * 0.28);
-    const ini = escHtml((p.name || '?').slice(0,2).toUpperCase());
-    return L.divIcon({
-      className: '',
-      html: `<div style="position:relative;width:${sz}px;height:${sz}px;pointer-events:none;">
-        <img src="${escHtml(logo)}"
-          style="position:absolute;inset:${pad}px;width:calc(100% - ${pad*2}px);height:calc(100% - ${pad*2}px);object-fit:contain;border-radius:2px;"
-          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-        <span style="display:none;position:absolute;inset:0;font-size:${fSz}px;font-weight:800;color:white;align-items:center;justify-content:center;text-align:center;padding:2px;">${ini}</span>
-      </div>`,
-      iconSize: [sz,sz], iconAnchor: [sz>>1,sz>>1]
-    });
-  }
+  const inner = src
+    ? `<img src="${escHtml(src)}"
+           style="position:absolute;inset:${pad}px;width:calc(100% - ${pad*2}px);height:calc(100% - ${pad*2}px);object-fit:contain;"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+       <span style="display:none;position:absolute;inset:0;font-size:${fSz}px;font-weight:800;color:${col};align-items:center;justify-content:center;">${ini}</span>`
+    : `<span style="position:absolute;inset:0;display:flex;font-size:${fSz}px;font-weight:800;color:${col};align-items:center;justify-content:center;">${ini}</span>`;
 
-  // Sin logo: nombre corto en blanco sobre el fondo de color del edificio
-  const sn  = escHtml(shortName(p.name));
-  const fSz = sz < 32 ? Math.round(sz * 0.28) : Math.round(sz * 0.21);
   return L.divIcon({
     className: '',
-    html: `<div style="position:relative;width:${sz}px;height:${sz}px;display:flex;align-items:center;justify-content:center;pointer-events:none;">
-      <span style="color:white;font-size:${fSz}px;font-weight:700;text-align:center;line-height:1.15;white-space:pre-line;text-shadow:0 1px 2px rgba(0,0,0,0.45);padding:${pad}px;">${sn}</span>
-    </div>`,
-    iconSize: [sz,sz], iconAnchor: [sz>>1,sz>>1]
+    html: `<div style="position:relative;width:${sz}px;height:${sz}px;overflow:hidden;pointer-events:none;">${inner}</div>`,
+    iconSize:   [sz, sz],
+    iconAnchor: [sz >> 1, sz >> 1]
   });
 }
 
@@ -723,10 +704,10 @@ async function initBusinessMap(data) {
     const center = polygonCentroid(lls);
     const sz     = buildingIconSz(lls, map);
 
-    // Polígono relleno con color de categoría (estilo CityMaps)
+    // Polígono blanco con borde de color de categoría
     const poly = L.polygon(lls, {
-      fillColor: col, fillOpacity: 0.82,
-      color: col, weight: 1, opacity: 1
+      fillColor: '#ffffff', fillOpacity: 1,
+      color: col, weight: 2, opacity: 0.9
     }).addTo(map);
 
     // Logo centrado dentro del edificio
@@ -744,19 +725,28 @@ async function initBusinessMap(data) {
     _bizBuildings.push({ poly, marker, place, lls });
   });
 
-  // ── FALLBACK: negocios sin edificio → punto pequeño con popup ───
+  // ── FALLBACK: negocios sin edificio (marcador flotante) ───
   unmatched.forEach(place => {
     const col = place.color || '#546E7A';
+    const sz  = 36;
+    const ini = escHtml((place.name || '?').charAt(0).toUpperCase());
+    const src = place.logo || '';
+    const pad = 4, fSz = 15;
+    const inner = src
+      ? `<img src="${escHtml(src)}" style="position:absolute;inset:${pad}px;width:calc(100% - ${pad*2}px);height:calc(100% - ${pad*2}px);object-fit:contain;"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+         <span style="display:none;position:absolute;inset:0;font-size:${fSz}px;font-weight:800;color:${col};align-items:center;justify-content:center;">${ini}</span>`
+      : `<span style="position:absolute;inset:0;display:flex;font-size:${fSz}px;font-weight:800;color:${col};align-items:center;justify-content:center;">${ini}</span>`;
     const icon = L.divIcon({
       className: '',
-      html: `<div style="width:10px;height:10px;background:${col};border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.35);"></div>`,
-      iconSize: [10,10], iconAnchor: [5,5]
+      html: `<div style="position:relative;width:${sz}px;height:${sz}px;background:#fff;border-radius:6px;border:2px solid ${col};box-shadow:0 2px 8px rgba(0,0,0,0.18);overflow:hidden;cursor:pointer;">${inner}</div>`,
+      iconSize: [sz, sz], iconAnchor: [sz>>1, sz>>1]
     });
+    const m = L.marker([place.lat, place.lng], { icon, zIndexOffset: 100 }).addTo(map);
     const rH = place.rating ? `<div style="margin-top:4px;font-size:11px;">⭐ ${place.rating.toFixed(1)} (${place.reviews} reseñas)</div>` : '';
     const oH = place.open === true  ? `<div style="color:#4CAF50;font-size:11px;margin-top:2px;">● Abierto</div>`
              : place.open === false ? `<div style="color:#f44336;font-size:11px;margin-top:2px;">● Cerrado</div>` : '';
-    L.marker([place.lat, place.lng], { icon, zIndexOffset: 50 }).addTo(map)
-      .bindPopup(`<div style="min-width:160px"><b style="font-size:13px">${escHtml(place.name)}</b><div style="color:#888;font-size:10px;margin-top:2px">${escHtml(place.category)}</div>${rH}${oH}</div>`, { maxWidth: 200 });
+    m.bindPopup(`<div style="min-width:160px"><b style="font-size:13px">${escHtml(place.name)}</b><div style="color:#888;font-size:10px;margin-top:2px">${escHtml(place.category)}</div>${rH}${oH}</div>`, { maxWidth: 200 });
   });
 
   // ── PIN DEL LOCAL OBJETIVO ────────────────────────────────
