@@ -545,27 +545,31 @@ function getIconSize(zoom) {
 }
 
 function bestLogoSrc(p) {
-  // 1. Logo de marca conocida (faviconV2 / static)
+  // Solo logos de marca conocida (Clearbit) o estáticos — nunca fotos ni iconos de categoría
   if (p.logo) return p.logo;
-  // 2. Icono de categoría de Google Maps (siempre disponible, nunca una foto)
-  if (p.icon) return p.icon;
   return '';
 }
 
 function bizIcon(p, sz) {
-  const col  = p.color || '#546E7A';
-  const ini  = escHtml((p.name || '?').charAt(0).toUpperCase());
-  const iSz  = Math.round(sz * 0.80);
-  const fSz  = Math.round(sz * 0.44);
-  const src  = bestLogoSrc(p);
-  // max-width/max-height: el img nunca desborda, funciona con SVGs y PNGs de cualquier tamaño
-  const imgStyle = `max-width:${iSz}px;max-height:${iSz}px;width:auto;height:auto;object-fit:contain;flex-shrink:0;display:block;`;
+  const col = p.color || '#546E7A';
+  const ini = escHtml((p.name || '?').charAt(0).toUpperCase());
+  const fSz = Math.round(sz * 0.44);
+  const src = bestLogoSrc(p);
+  // pad: margen interior para que el logo respire dentro de la caja
+  const pad = Math.round(sz * 0.13);
+
+  // Usamos position:absolute + inset para que el sizing sea independiente
+  // de box-sizing (Leaflet sobreescribe box-sizing en sus contenedores).
   const inner = src
-    ? `<img src="${escHtml(src)}" style="${imgStyle}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;font-size:${fSz}px;font-weight:700;color:${col};width:100%;height:100%;align-items:center;justify-content:center;">${ini}</span>`
-    : `<span style="font-size:${fSz}px;font-weight:700;color:${col};">${ini}</span>`;
+    ? `<img src="${escHtml(src)}"
+           style="position:absolute;inset:${pad}px;width:calc(100% - ${pad*2}px);height:calc(100% - ${pad*2}px);object-fit:contain;"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+       <span style="display:none;position:absolute;inset:0;font-size:${fSz}px;font-weight:700;color:${col};align-items:center;justify-content:center;">${ini}</span>`
+    : `<span style="position:absolute;inset:0;display:flex;font-size:${fSz}px;font-weight:700;color:${col};align-items:center;justify-content:center;">${ini}</span>`;
+
   return L.divIcon({
     className: '',
-    html: `<div style="width:${sz}px;height:${sz}px;background:#fff;border-radius:7px;border:1.5px solid #ddd;box-shadow:0 2px 8px rgba(0,0,0,0.16);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;">${inner}</div>`,
+    html: `<div style="position:relative;width:${sz}px;height:${sz}px;background:#fff;border-radius:8px;border:2px solid #ddd;box-shadow:0 2px 8px rgba(0,0,0,0.15);overflow:hidden;cursor:pointer;">${inner}</div>`,
     iconSize:   [sz, sz],
     iconAnchor: [sz >> 1, sz >> 1]
   });
