@@ -540,22 +540,25 @@ function escHtml(s) {
 // ── MAPA DE NEGOCIOS ──────────────────────────────────────
 
 function getIconSize(zoom) {
-  // zoom 14→19px  16→37px  17→46px  18→55px (cap 60)
-  return Math.max(19, Math.min(60, (zoom - 13) * 9));
+  // zoom 15→36px  16→52px  17→68px  18→80px (cap 80)
+  return Math.max(36, Math.min(80, (zoom - 13) * 16));
 }
 
 function bizIcon(p, sz) {
-  const col  = p.color || '#546E7A';
-  const ini  = escHtml((p.name || '?').charAt(0).toUpperCase());
-  const iSz  = sz - 10;
-  const fSz  = Math.round(sz * 0.38);
-  const fb   = `<span style="font-size:${fSz}px;font-weight:700;color:${col};">${ini}</span>`;
-  const img  = p.logo
-    ? `<img src="${escHtml(p.logo)}" style="max-width:${iSz}px;max-height:${iSz}px;object-fit:contain;" onerror="this.outerHTML='${fb.replace(/'/g, "\\'")}'">`
-    : fb;
+  const col = p.color || '#546E7A';
+  const ini = escHtml((p.name || '?').charAt(0).toUpperCase());
+  const iSz = Math.round(sz * 0.82);
+  const fSz = Math.round(sz * 0.44);
+  let inner;
+  if (p.logo) {
+    // Fallback: sibling span shown when image fails (avoids onerror escaping issues)
+    inner = `<img src="${escHtml(p.logo)}" style="max-width:${iSz}px;max-height:${iSz}px;object-fit:contain;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;font-size:${fSz}px;font-weight:700;color:${col};align-items:center;justify-content:center;">${ini}</span>`;
+  } else {
+    inner = `<span style="font-size:${fSz}px;font-weight:700;color:${col};">${ini}</span>`;
+  }
   return L.divIcon({
     className: '',
-    html: `<div style="width:${sz}px;height:${sz}px;background:#fff;border-radius:7px;border:1.5px solid #ddd;box-shadow:0 2px 8px rgba(0,0,0,0.16);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;">${img}</div>`,
+    html: `<div style="width:${sz}px;height:${sz}px;background:#fff;border-radius:7px;border:1.5px solid #ddd;box-shadow:0 2px 8px rgba(0,0,0,0.16);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;">${inner}</div>`,
     iconSize:   [sz, sz],
     iconAnchor: [sz >> 1, sz >> 1]
   });
