@@ -319,14 +319,10 @@ def logo_url(name):
     for key, fname in LOCAL_LOGOS.items():
         if key and len(key) >= 4 and key in name_norm:
             return "/static/logos/" + fname
-    # 3. Fallback faviconV2
+    # 3. Clearbit — logos de alta calidad para marcas conocidas
     for brand, domain in BRAND_DOMAINS.items():
         if brand in name_lower:
-            return (
-                f"https://t2.gstatic.com/faviconV2"
-                f"?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL"
-                f"&url=https://{domain}&size=128"
-            )
+            return f"https://logo.clearbit.com/{domain}"
     return ""
 
 
