@@ -590,17 +590,20 @@ function sortByStreet(map, places) {
     .map(x => x.p);
 }
 
-// Calcula las posiciones en fila (ya en orden de calle)
+// Calcula las posiciones en fila y el tamaño efectivo para evitar solapamientos
+// Devuelve { positions: LatLng[], sizes: number[] }
 function rowPositions(map, ordered, sz) {
   const n = ordered.length;
-  if (n === 0) return [];
+  if (n === 0) return { positions: [], sizes: [] };
   const pts = ordered.map(p => map.latLngToContainerPoint(L.latLng(p.lat, p.lng)));
-
-  const offset = Math.round(sz * 0.45 + 4); // distancia perpendicular uniforme
 
   // Caso especial: un solo negocio — colocarlo encima de su posición real
   if (n === 1) {
-    return [map.containerPointToLatLng([pts[0].x, pts[0].y - offset])];
+    const off = Math.round(sz * 0.45 + 4);
+    return {
+      positions: [map.containerPointToLatLng([pts[0].x, pts[0].y - off])],
+      sizes: [sz]
+    };
   }
 
   const cx = pts.reduce((s, p) => s + p.x, 0) / n;
@@ -615,17 +618,34 @@ function rowPositions(map, ordered, sz) {
   // Vector perpendicular unitario: (-uy, ux)
   const px = -uy, py = ux;
 
-  // Cada logo: posición real sobre el eje de la calle + lado correcto (acera donde está el negocio)
-  // El signo del producto vectorial 2D determina el lado: (ux × dy - uy × dx)
-  return ordered.map((_, i) => {
+  // Proyección y lado de cada negocio
+  const items = ordered.map((_, i) => {
     const dx = pts[i].x - cx, dy = pts[i].y - cy;
-    const t    = dx * ux + dy * uy;      // proyección real sobre el eje de la calle
-    const side = (ux * dy - uy * dx) >= 0 ? 1 : -1; // qué acera: +1 ó -1
-    return map.containerPointToLatLng([
+    return {
+      t:    dx * ux + dy * uy,                 // posición real sobre el eje de la calle
+      side: (ux * dy - uy * dx) >= 0 ? 1 : -1 // qué acera: +1 ó -1
+    };
+  });
+
+  // Mínima distancia entre logos adyacentes del mismo lado → límite de tamaño sin solapamiento
+  let minGap = Infinity;
+  [-1, 1].forEach(s => {
+    const ts = items.filter(x => x.side === s).map(x => x.t).sort((a, b) => a - b);
+    for (let i = 1; i < ts.length; i++) minGap = Math.min(minGap, ts[i] - ts[i-1]);
+  });
+
+  // Tamaño efectivo: reducir si hay solapamiento, mínimo 16px
+  const effSz  = minGap < sz ? Math.max(16, Math.floor(minGap)) : sz;
+  const offset = Math.round(effSz * 0.45 + 4);
+
+  const positions = items.map(({ t, side }) =>
+    map.containerPointToLatLng([
       cx + ux * t + px * side * offset,
       cy + uy * t + py * side * offset
-    ]);
-  });
+    ])
+  );
+
+  return { positions, sizes: Array(n).fill(effSz) };
 }
 
 let _rows = []; // { orderedPlaces, markers }
@@ -667,11 +687,11 @@ function initBusinessMap(data) {
     const valid = street.places.filter(p => p.lat && p.lng);
     if (!valid.length) return;
 
-    const ordered   = sortByStreet(map, valid);
-    const positions = rowPositions(map, ordered, sz0);
+    const ordered = sortByStreet(map, valid);
+    const { positions, sizes: szArr } = rowPositions(map, ordered, sz0);
 
     const markers = ordered.map((place, i) => {
-      const m = L.marker(positions[i], { icon: bizIcon(place, sz0), zIndexOffset: 100 }).addTo(map);
+      const m = L.marker(positions[i], { icon: bizIcon(place, szArr[i]), zIndexOffset: 100 }).addTo(map);
       m._place = place;
       const rH = place.rating ? `<div style="margin-top:4px;font-size:11px;">⭐ ${place.rating.toFixed(1)} (${place.reviews} reseñas)</div>` : '';
       const oH = place.open === true  ? `<div style="color:#4CAF50;font-size:11px;margin-top:2px;">● Abierto</div>`
@@ -687,10 +707,10 @@ function initBusinessMap(data) {
   const recalc = () => {
     const sz = getIconSize(map.getZoom());
     _rows.forEach(row => {
-      const pos = rowPositions(map, row.orderedPlaces, sz);
+      const { positions: pos, sizes: szArr } = rowPositions(map, row.orderedPlaces, sz);
       row.markers.forEach((m, i) => {
         m.setLatLng(pos[i]);
-        m.setIcon(bizIcon(row.orderedPlaces[i], sz));
+        m.setIcon(bizIcon(row.orderedPlaces[i], szArr[i]));
       });
     });
   };
