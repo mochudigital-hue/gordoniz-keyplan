@@ -648,6 +648,36 @@ function rowPositions(map, ordered, sz) {
   return { positions, sizes: Array(n).fill(effSz) };
 }
 
+// ── ANTI-SOLAPAMIENTO GLOBAL ──────────────────────────────────────────────
+// Recibe los orderedPlaces de cada calle, calcula posiciones con sz,
+// luego compara todos los marcadores entre sí para capear el tamaño display
+// SIN cambiar las posiciones (evita dependencia circular).
+function computeAllRows(map, rowsData, sz) {
+  // 1ª pasada: posiciones + tamaños per-calle (cubre solapamientos mismo-lado)
+  const results = rowsData.map(op => rowPositions(map, op, sz));
+
+  // Distancia mínima entre TODOS los marcadores del mapa
+  const allPts = results.flatMap(r =>
+    r.positions.map(ll => map.latLngToContainerPoint(ll))
+  );
+  let minDist = Infinity;
+  for (let i = 0; i < allPts.length; i++) {
+    for (let j = i + 1; j < allPts.length; j++) {
+      const d = Math.hypot(allPts[i].x - allPts[j].x, allPts[i].y - allPts[j].y);
+      if (d < minDist) minDist = d;
+    }
+  }
+
+  // Si hay solapamientos entre calles distintas, reducir tamaño display
+  // (las posiciones NO cambian → sin dependencia circular)
+  if (!isFinite(minDist) || minDist >= sz) return results;
+  const cap = Math.max(16, Math.floor(minDist * 0.85));
+  return results.map(r => ({
+    positions: r.positions,
+    sizes: r.sizes.map(s => Math.min(s, cap))
+  }));
+}
+
 let _rows = []; // { orderedPlaces, markers }
 
 function initBusinessMap(data) {
@@ -682,14 +712,19 @@ function initBusinessMap(data) {
 
   const sz0 = getIconSize(map.getZoom());
 
-  // Crear fila de logos por cada calle
+  // Recoger orderedPlaces por cada calle
+  const streetOrders = [];
   data.streets.forEach(street => {
     const valid = street.places.filter(p => p.lat && p.lng);
     if (!valid.length) return;
+    streetOrders.push(sortByStreet(map, valid));
+  });
 
-    const ordered = sortByStreet(map, valid);
-    const { positions, sizes: szArr } = rowPositions(map, ordered, sz0);
+  // Layout global anti-solapamiento
+  const rowResults = computeAllRows(map, streetOrders, sz0);
 
+  streetOrders.forEach((ordered, ri) => {
+    const { positions, sizes: szArr } = rowResults[ri];
     const markers = ordered.map((place, i) => {
       const m = L.marker(positions[i], { icon: bizIcon(place, szArr[i]), zIndexOffset: 100 }).addTo(map);
       m._place = place;
@@ -699,15 +734,15 @@ function initBusinessMap(data) {
       m.bindPopup(`<div style="min-width:160px"><b style="font-size:13px">${escHtml(place.name)}</b><div style="color:#888;font-size:10px;margin-top:2px">${escHtml(place.category)}</div>${rH}${oH}</div>`, { maxWidth: 200 });
       return m;
     });
-
     _rows.push({ orderedPlaces: ordered, markers });
   });
 
-  // En cada zoom: recalcular posiciones y tamaños manteniendo el orden de calle
+  // En cada zoom/rotación: recalcular con anti-solapamiento global
   const recalc = () => {
     const sz = getIconSize(map.getZoom());
-    _rows.forEach(row => {
-      const { positions: pos, sizes: szArr } = rowPositions(map, row.orderedPlaces, sz);
+    const results = computeAllRows(map, _rows.map(r => r.orderedPlaces), sz);
+    _rows.forEach((row, ri) => {
+      const { positions: pos, sizes: szArr } = results[ri];
       row.markers.forEach((m, i) => {
         m.setLatLng(pos[i]);
         m.setIcon(bizIcon(row.orderedPlaces[i], szArr[i]));
