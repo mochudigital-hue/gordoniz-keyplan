@@ -207,6 +207,7 @@ BRAND_DOMAINS = {
     'h10': 'h10hotels.com', 'melia': 'melia.com',
     'nh': 'nh-hotels.es', 'ibis': 'ibis.com', 'novotel': 'novotel.com',
     'ac hotel': 'marriott.com', 'petit palace': 'petitpalace.com',
+    # Lujo / moda internacional
     'gucci': 'gucci.com', 'prada': 'prada.com', 'chanel': 'chanel.com',
     'dior': 'dior.com', 'louis vuitton': 'louisvuitton.com', 'lv': 'louisvuitton.com',
     'hermes': 'hermes.com', 'hermes paris': 'hermes.com',
@@ -220,34 +221,44 @@ BRAND_DOMAINS = {
     'loewe': 'loewe.com', 'camper': 'camper.com',
     'tous': 'tous.com', 'pandora': 'pandora.net',
     'swarovski': 'swarovski.com', 'folli follie': 'follifollie.com',
-    'pedro del hierro': 'pedrodelhierro.com', 'pedro garcia': 'pedrogarcia.com',
+    # Moda espanola / europea
+    'pedro del hierro': 'pedrodel hierro.com', 'pedro garcia': 'pedrogarcia.com',
     'adolfo dominguez': 'adolfodominguez.com', 'custo': 'custo.com',
     'munich': 'munichsports.com', 'levi': 'levi.com', 'levis': 'levi.com',
     'timberland': 'timberland.com', 'clarks': 'clarks.com',
     'geox': 'geox.com', 'pikolinos': 'pikolinos.com',
     'guess': 'guess.com', 'calvin klein': 'calvinklein.com',
+    # Bancos / seguros adicionales
     'bankinter': 'bankinter.com', 'ing': 'ing.es', 'unicaja': 'unicaja.es',
     'kutxabank': 'kutxabank.es', 'ibercaja': 'ibercaja.es', 'openbank': 'openbank.es',
     'generali': 'generali.es', 'allianz': 'allianz.es',
-    'viena capellanes': 'vienacapellanes.com', 'lizarran': 'lizarran.es',
+    # Restaurantes / cafes
+    'viena capellanes': 'vienacapellanes.com', 'lizarrán': 'lizarran.es',
     'la tagliatella': 'latagliatella.es', 'goiko': 'goiko.com',
-    'five guys': 'fiveguys.com',
+    'five guys': 'fiveguys.com', 'vips': 'vips.es',
     'grosso napoletano': 'grossonapoletano.com', 'lateral': 'lateral.es',
-    'celicioso': 'celicioso.com',
+    'celicioso': 'celicioso.com', 'bocata': 'bocata.com',
+    # Deportes / ocio
     'intersport': 'intersport.es', 'joma': 'joma.com',
+    # Optica / salud
     'vision': 'visionlab.es', 'multioptical': 'multioptical.es',
     'alain afflelou': 'alainafflelou.es', 'optica 2000': 'optica2000.es',
+    # Perfumeria / cosmetica
     'rituals': 'rituals.com', 'kiehl': 'kiehls.com',
     'nyx': 'nyxcosmetics.es', 'mac': 'maccosmetics.es',
+    # Papeleria / hogar
     'casa del libro': 'casadellibro.com',
-    'opencor': 'opencor.es',
+    'opencor': 'opencor.es', 'dia': 'dia.es',
+    # Electronica
     'huawei': 'huawei.com', 'xiaomi': 'xiaomi.es',
     'pc componentes': 'pccomponentes.com',
+    # Lujo relojeria / escritura
     'montblanc': 'montblanc.com', 'mont blanc': 'montblanc.com',
     'rolex': 'rolex.com', 'omega': 'omegawatches.com',
     'longines': 'longines.com', 'tag heuer': 'tagheuer.com',
     'iwc': 'iwc.com', 'breitling': 'breitling.com',
     'bulgari': 'bulgari.com', 'bvlgari': 'bulgari.com',
+    # Moda lujo adicional
     'bimba y lola': 'bimbaylola.com', 'bimba': 'bimbaylola.com',
     'agatha': 'agatha.es', 'aristocrazy': 'aristocrazy.com',
     'uterque': 'uterque.com', 'oysho': 'oysho.com',
@@ -261,13 +272,18 @@ BRAND_DOMAINS = {
     'sandro': 'sandro-paris.com', 'maje': 'maje.com',
     'ba&sh': 'ba-sh.com', 'bash': 'ba-sh.com',
     'claudie pierlot': 'claudiepierlot.com',
+    # Zapatos lujo
     'manolo blahnik': 'manoloblahnik.com',
     'christian louboutin': 'christianlouboutin.com', 'louboutin': 'christianlouboutin.com',
     'jimmy choo': 'jimmychoo.com', 'aquazzura': 'aquazzura.com',
     'stuart weitzman': 'stuartweitzman.com',
+    # Restaurantes zona Serrano
     'ten con ten': 'tenconten.es',
     'amazonia': 'restauranteamazonia.es',
+    'lateral': 'lateral.es',
+    # Optica zona
     'optica serrano': 'opticaserrano.com',
+    # Joyeria
     'carrera y carrera': 'carreraycarrera.com',
     'rabat': 'rabat.es',
 }
@@ -297,6 +313,26 @@ def logo_url(name):
 @app.route("/api/config")
 def config():
     return jsonify({"has_server_key": bool(SERVER_API_KEY)})
+
+
+@app.route("/api/photo/<path:ref>")
+def photo_proxy(ref):
+    """Proxy para fotos de Google Places: evita exponer la API key en el frontend."""
+    key = SERVER_API_KEY
+    if not key:
+        return '', 404
+    try:
+        url = (
+            f"https://maps.googleapis.com/maps/api/place/photo"
+            f"?maxwidth=128&photo_reference={ref}&key={key}"
+        )
+        r = requests.get(url, allow_redirects=True, timeout=8)
+        if r.status_code == 200:
+            from flask import Response
+            return Response(r.content, content_type=r.headers.get('content-type', 'image/jpeg'))
+    except Exception:
+        pass
+    return '', 404
 
 
 @app.route("/")
@@ -351,6 +387,8 @@ def keyplan():
     by_street = defaultdict(list)
     for p in places:
         street = extract_street(p.get("vicinity", ""))
+        photos = p.get("photos", [])
+        photo_ref = photos[0].get("photo_reference", "") if photos else ""
         by_street[street].append({
             "name": p.get("name", ""),
             "rating": p.get("rating", 0),
@@ -359,6 +397,7 @@ def keyplan():
             "color": place_color(p.get("types", [])),
             "category": place_category(p.get("types", [])),
             "logo": logo_url(p.get("name", "")),
+            "photoRef": photo_ref,
             "open": p.get("opening_hours", {}).get("open_now"),
             "vicinity": p.get("vicinity", ""),
             "lat": p.get("geometry", {}).get("location", {}).get("lat"),
