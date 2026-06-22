@@ -547,9 +547,7 @@ function getIconSize(zoom) {
 function bestLogoSrc(p) {
   // 1. Logo de marca conocida (faviconV2 / static)
   if (p.logo) return p.logo;
-  // 2. Foto real de Google Places (CDN URL pre-fetched en servidor)
-  if (p.photoUrl) return p.photoUrl;
-  // 3. Icono de categoría de Google Maps (siempre disponible)
+  // 2. Icono de categoría de Google Maps (siempre disponible, nunca una foto)
   if (p.icon) return p.icon;
   return '';
 }
