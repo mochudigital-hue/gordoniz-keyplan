@@ -575,42 +575,59 @@ function bizIcon(p, sz) {
   });
 }
 
-function resolveCollisions(map, markers, sz) {
-  if (!markers.length) return;
-  const minD = sz + 3;
-  const pts  = markers.map(m => {
-    const p = map.latLngToContainerPoint(m._origLL);
-    return { m, x: p.x, y: p.y };
-  });
-  for (let it = 0; it < 80; it++) {
-    let moved = false;
-    for (let i = 0; i < pts.length; i++) {
-      for (let j = i + 1; j < pts.length; j++) {
-        const a = pts[i], b = pts[j];
-        const dx = b.x - a.x, dy = b.y - a.y;
-        const d  = Math.sqrt(dx * dx + dy * dy) || 0.01;
-        if (d < minD) {
-          const push = (minD - d) / 2 + 0.5;
-          const nx = dx / d, ny = dy / d;
-          a.x -= nx * push; a.y -= ny * push;
-          b.x += nx * push; b.y += ny * push;
-          moved = true;
-        }
-      }
-    }
-    if (!moved) break;
-  }
-  pts.forEach(pt => pt.m.setLatLng(map.containerPointToLatLng([pt.x, pt.y])));
+// ── FILAS POR CALLE ───────────────────────────────────────
+
+// Ordena los negocios de una calle por su posición a lo largo de ella
+function sortByStreet(map, places) {
+  if (places.length <= 1) return [...places];
+  const pts = places.map(p => map.latLngToContainerPoint(L.latLng(p.lat, p.lng)));
+  const spanX = Math.max(...pts.map(p => p.x)) - Math.min(...pts.map(p => p.x));
+  const spanY = Math.max(...pts.map(p => p.y)) - Math.min(...pts.map(p => p.y));
+  return places
+    .map((p, i) => ({ p, v: spanX >= spanY ? pts[i].x : pts[i].y }))
+    .sort((a, b) => a.v - b.v)
+    .map(x => x.p);
 }
+
+// Calcula las posiciones en fila (ya en orden de calle)
+function rowPositions(map, ordered, sz) {
+  const n = ordered.length;
+  if (n === 0) return [];
+  const pts = ordered.map(p => map.latLngToContainerPoint(L.latLng(p.lat, p.lng)));
+  const cx = pts.reduce((s, p) => s + p.x, 0) / n;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / n;
+
+  // Vector dirección de la calle (extremo a extremo)
+  let ux = 1, uy = 0;
+  if (n > 1) {
+    const ddx = pts[n-1].x - pts[0].x, ddy = pts[n-1].y - pts[0].y;
+    const l = Math.sqrt(ddx*ddx + ddy*ddy);
+    if (l > 5) { ux = ddx/l; uy = ddy/l; }
+  }
+
+  // Perpendicular, siempre hacia "arriba" en pantalla (hacia el norte visual)
+  let nx = -uy, ny = ux;
+  if (ny > 0) { nx = -nx; ny = -ny; }
+  if (nx === 0 && ny === 0) { nx = 0; ny = -1; }
+
+  const step   = sz + 3;                    // separación entre logos
+  const offset = Math.round(sz * 0.45 + 4); // distancia al borde de la calle
+
+  return ordered.map((_, i) => {
+    const t = (i - (n - 1) / 2) * step;
+    return map.containerPointToLatLng([cx + ux*t + nx*offset, cy + uy*t + ny*offset]);
+  });
+}
+
+let _rows = []; // { orderedPlaces, markers }
 
 function initBusinessMap(data) {
   if (window._bizMap) { window._bizMap.remove(); window._bizMap = null; }
+  _rows = [];
 
   const map = L.map('biz-map', { zoomControl: true }).setView([data.lat, data.lng], 17);
   window._bizMap = map;
 
-  // Tiles minimalistas: fondo blanco, calles grises, nombres de calle
-  // Capa base (calles sin etiquetas) + capa de etiquetas encima
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd', maxZoom: 21, opacity: 1
   }).addTo(map);
@@ -629,36 +646,43 @@ function initBusinessMap(data) {
     zIndexOffset: 2000
   }).addTo(map).bindPopup(`<b>${escHtml(data.formatted_address)}</b>`);
 
-  // Colocar marcadores en posición real (deduplicar coordenadas exactas)
-  const markers = [];
-  const seen    = new Set();
+  const sz0 = getIconSize(map.getZoom());
+
+  // Crear fila de logos por cada calle
   data.streets.forEach(street => {
-    street.places.forEach(p => {
-      if (!p.lat || !p.lng) return;
-      const key = p.lat.toFixed(5) + ',' + p.lng.toFixed(5);
-      if (seen.has(key)) return;
-      seen.add(key);
-      const sz = getIconSize(map.getZoom());
-      const m  = L.marker([p.lat, p.lng], { icon: bizIcon(p, sz), zIndexOffset: 100 }).addTo(map);
-      m._origLL = L.latLng(p.lat, p.lng);
-      m._place  = p;
-      const rH = p.rating ? `<div style="margin-top:4px;font-size:11px;">⭐ ${p.rating.toFixed(1)} (${p.reviews} reseñas)</div>` : '';
-      const oH = p.open === true  ? `<div style="color:#4CAF50;font-size:11px;margin-top:2px;">● Abierto</div>`
-               : p.open === false ? `<div style="color:#f44336;font-size:11px;margin-top:2px;">● Cerrado</div>` : '';
-      m.bindPopup(`<div style="min-width:160px"><b style="font-size:13px">${escHtml(p.name)}</b><div style="color:#888;font-size:10px;margin-top:2px">${escHtml(p.category)}</div>${rH}${oH}</div>`, { maxWidth: 200 });
-      markers.push(m);
+    const valid = street.places.filter(p => p.lat && p.lng);
+    if (!valid.length) return;
+
+    const ordered   = sortByStreet(map, valid);
+    const positions = rowPositions(map, ordered, sz0);
+
+    const markers = ordered.map((place, i) => {
+      const m = L.marker(positions[i], { icon: bizIcon(place, sz0), zIndexOffset: 100 }).addTo(map);
+      m._place = place;
+      const rH = place.rating ? `<div style="margin-top:4px;font-size:11px;">⭐ ${place.rating.toFixed(1)} (${place.reviews} reseñas)</div>` : '';
+      const oH = place.open === true  ? `<div style="color:#4CAF50;font-size:11px;margin-top:2px;">● Abierto</div>`
+               : place.open === false ? `<div style="color:#f44336;font-size:11px;margin-top:2px;">● Cerrado</div>` : '';
+      m.bindPopup(`<div style="min-width:160px"><b style="font-size:13px">${escHtml(place.name)}</b><div style="color:#888;font-size:10px;margin-top:2px">${escHtml(place.category)}</div>${rH}${oH}</div>`, { maxWidth: 200 });
+      return m;
     });
+
+    _rows.push({ orderedPlaces: ordered, markers });
   });
 
-  // Función de actualización: rescalar iconos y resolver colisiones
-  const update = () => {
+  // En cada zoom: recalcular posiciones y tamaños manteniendo el orden de calle
+  const recalc = () => {
     const sz = getIconSize(map.getZoom());
-    markers.forEach(m => { m.setLatLng(m._origLL); m.setIcon(bizIcon(m._place, sz)); });
-    resolveCollisions(map, markers, sz);
+    _rows.forEach(row => {
+      const pos = rowPositions(map, row.orderedPlaces, sz);
+      row.markers.forEach((m, i) => {
+        m.setLatLng(pos[i]);
+        m.setIcon(bizIcon(row.orderedPlaces[i], sz));
+      });
+    });
   };
 
-  map.on('zoomend', update);
-  map.whenReady(() => setTimeout(update, 150));
+  map.on('zoomend', recalc);
+  map.whenReady(() => setTimeout(recalc, 150));
 }
 
 // Enter para generar
