@@ -426,30 +426,6 @@ def keyplan():
             "lng": p.get("geometry", {}).get("location", {}).get("lng"),
         })
 
-    # Pre-fetch photo CDN URLs concurrentemente (evita proxy, no expone API key)
-    photo_refs = {}
-    for ps in by_street.values():
-        for place in ps:
-            ref = place.get("photoRef", "")
-            if ref and ref not in photo_refs:
-                photo_refs[ref] = ''
-
-    if photo_refs and api_key:
-        with ThreadPoolExecutor(max_workers=20) as ex:
-            fut_map = {ex.submit(get_photo_cdn, ref, api_key): ref for ref in photo_refs}
-            for fut in as_completed(fut_map):
-                ref = fut_map[fut]
-                try:
-                    photo_refs[ref] = fut.result()
-                except Exception:
-                    pass
-
-        for ps in by_street.values():
-            for place in ps:
-                ref = place.get("photoRef", "")
-                if ref:
-                    place["photoUrl"] = photo_refs.get(ref, "")
-
     # Determinar calle objetivo (la calle del inmueble)
     target_street = extract_street(formatted.split(",")[0])
 
