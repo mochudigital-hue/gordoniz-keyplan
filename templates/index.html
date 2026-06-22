@@ -595,30 +595,36 @@ function rowPositions(map, ordered, sz) {
   const n = ordered.length;
   if (n === 0) return [];
   const pts = ordered.map(p => map.latLngToContainerPoint(L.latLng(p.lat, p.lng)));
+
+  const offset = Math.round(sz * 0.45 + 4); // distancia perpendicular uniforme
+
+  // Caso especial: un solo negocio — colocarlo encima de su posición real
+  if (n === 1) {
+    return [map.containerPointToLatLng([pts[0].x, pts[0].y - offset])];
+  }
+
   const cx = pts.reduce((s, p) => s + p.x, 0) / n;
   const cy = pts.reduce((s, p) => s + p.y, 0) / n;
 
   // Vector dirección de la calle (extremo a extremo)
   let ux = 1, uy = 0;
-  if (n > 1) {
-    const ddx = pts[n-1].x - pts[0].x, ddy = pts[n-1].y - pts[0].y;
-    const l = Math.sqrt(ddx*ddx + ddy*ddy);
-    if (l > 5) { ux = ddx/l; uy = ddy/l; }
-  }
+  const ddx = pts[n-1].x - pts[0].x, ddy = pts[n-1].y - pts[0].y;
+  const l = Math.sqrt(ddx*ddx + ddy*ddy);
+  if (l > 5) { ux = ddx/l; uy = ddy/l; }
 
-  // Perpendicular, siempre hacia "arriba" en pantalla (hacia el norte visual)
-  let nx = -uy, ny = ux;
-  if (ny > 0) { nx = -nx; ny = -ny; }
-  if (nx === 0 && ny === 0) { nx = 0; ny = -1; }
+  // Vector perpendicular unitario: (-uy, ux)
+  const px = -uy, py = ux;
 
-  const offset = Math.round(sz * 0.45 + 4); // distancia perpendicular al borde de la calle
-
-  // Cada logo en su posición REAL a lo largo de la calle (proyectada sobre el eje de la calle),
-  // pero todos a la misma distancia perpendicular. Se permiten solapamientos.
+  // Cada logo: posición real sobre el eje de la calle + lado correcto (acera donde está el negocio)
+  // El signo del producto vectorial 2D determina el lado: (ux × dy - uy × dx)
   return ordered.map((_, i) => {
     const dx = pts[i].x - cx, dy = pts[i].y - cy;
-    const t = dx * ux + dy * uy; // posición real del negocio proyectada sobre el eje de la calle
-    return map.containerPointToLatLng([cx + ux*t + nx*offset, cy + uy*t + ny*offset]);
+    const t    = dx * ux + dy * uy;      // proyección real sobre el eje de la calle
+    const side = (ux * dy - uy * dx) >= 0 ? 1 : -1; // qué acera: +1 ó -1
+    return map.containerPointToLatLng([
+      cx + ux * t + px * side * offset,
+      cy + uy * t + py * side * offset
+    ]);
   });
 }
 
