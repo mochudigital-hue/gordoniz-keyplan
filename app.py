@@ -207,7 +207,6 @@ BRAND_DOMAINS = {
     'h10': 'h10hotels.com', 'melia': 'melia.com',
     'nh': 'nh-hotels.es', 'ibis': 'ibis.com', 'novotel': 'novotel.com',
     'ac hotel': 'marriott.com', 'petit palace': 'petitpalace.com',
-    # Lujo / moda internacional
     'gucci': 'gucci.com', 'prada': 'prada.com', 'chanel': 'chanel.com',
     'dior': 'dior.com', 'louis vuitton': 'louisvuitton.com', 'lv': 'louisvuitton.com',
     'hermes': 'hermes.com', 'hermes paris': 'hermes.com',
@@ -221,44 +220,34 @@ BRAND_DOMAINS = {
     'loewe': 'loewe.com', 'camper': 'camper.com',
     'tous': 'tous.com', 'pandora': 'pandora.net',
     'swarovski': 'swarovski.com', 'folli follie': 'follifollie.com',
-    # Moda espanola / europea
-    'pedro del hierro': 'pedrodel hierro.com', 'pedro garcia': 'pedrogarcia.com',
+    'pedro del hierro': 'pedrodelhierro.com', 'pedro garcia': 'pedrogarcia.com',
     'adolfo dominguez': 'adolfodominguez.com', 'custo': 'custo.com',
     'munich': 'munichsports.com', 'levi': 'levi.com', 'levis': 'levi.com',
     'timberland': 'timberland.com', 'clarks': 'clarks.com',
     'geox': 'geox.com', 'pikolinos': 'pikolinos.com',
     'guess': 'guess.com', 'calvin klein': 'calvinklein.com',
-    # Bancos / seguros adicionales
     'bankinter': 'bankinter.com', 'ing': 'ing.es', 'unicaja': 'unicaja.es',
     'kutxabank': 'kutxabank.es', 'ibercaja': 'ibercaja.es', 'openbank': 'openbank.es',
     'generali': 'generali.es', 'allianz': 'allianz.es',
-    # Restaurantes / cafes
     'viena capellanes': 'vienacapellanes.com', 'lizarran': 'lizarran.es',
     'la tagliatella': 'latagliatella.es', 'goiko': 'goiko.com',
-    'five guys': 'fiveguys.com', 'vips': 'vips.es',
+    'five guys': 'fiveguys.com',
     'grosso napoletano': 'grossonapoletano.com', 'lateral': 'lateral.es',
-    'celicioso': 'celicioso.com', 'bocata': 'bocata.com',
-    # Deportes / ocio
+    'celicioso': 'celicioso.com',
     'intersport': 'intersport.es', 'joma': 'joma.com',
-    # Optica / salud
     'vision': 'visionlab.es', 'multioptical': 'multioptical.es',
     'alain afflelou': 'alainafflelou.es', 'optica 2000': 'optica2000.es',
-    # Perfumeria / cosmetica
     'rituals': 'rituals.com', 'kiehl': 'kiehls.com',
     'nyx': 'nyxcosmetics.es', 'mac': 'maccosmetics.es',
-    # Papeleria / hogar
     'casa del libro': 'casadellibro.com',
-    'opencor': 'opencor.es', 'dia': 'dia.es',
-    # Electronica
+    'opencor': 'opencor.es',
     'huawei': 'huawei.com', 'xiaomi': 'xiaomi.es',
     'pc componentes': 'pccomponentes.com',
-    # Lujo relojeria / escritura
     'montblanc': 'montblanc.com', 'mont blanc': 'montblanc.com',
     'rolex': 'rolex.com', 'omega': 'omegawatches.com',
     'longines': 'longines.com', 'tag heuer': 'tagheuer.com',
     'iwc': 'iwc.com', 'breitling': 'breitling.com',
     'bulgari': 'bulgari.com', 'bvlgari': 'bulgari.com',
-    # Moda lujo adicional
     'bimba y lola': 'bimbaylola.com', 'bimba': 'bimbaylola.com',
     'agatha': 'agatha.es', 'aristocrazy': 'aristocrazy.com',
     'uterque': 'uterque.com', 'oysho': 'oysho.com',
@@ -272,14 +261,12 @@ BRAND_DOMAINS = {
     'sandro': 'sandro-paris.com', 'maje': 'maje.com',
     'ba&sh': 'ba-sh.com', 'bash': 'ba-sh.com',
     'claudie pierlot': 'claudiepierlot.com',
-    # Zapatos lujo
     'manolo blahnik': 'manoloblahnik.com',
     'christian louboutin': 'christianlouboutin.com', 'louboutin': 'christianlouboutin.com',
     'jimmy choo': 'jimmychoo.com', 'aquazzura': 'aquazzura.com',
     'stuart weitzman': 'stuartweitzman.com',
     'ten con ten': 'tenconten.es',
     'amazonia': 'restauranteamazonia.es',
-    'lateral': 'lateral.es',
     'optica serrano': 'opticaserrano.com',
     'carrera y carrera': 'carreraycarrera.com',
     'rabat': 'rabat.es',
@@ -289,11 +276,14 @@ def logo_url(name):
     """Busca logo: 1 local static/logos, 2 Google faviconV2."""
     name_lower = name.lower().strip()
     name_norm  = _norm(name)
+    # 1. Logo local exacto
     if name_norm in LOCAL_LOGOS:
         return "/static/logos/" + LOCAL_LOGOS[name_norm]
+    # 2. Clave del logo contenida en el nombre
     for key, fname in LOCAL_LOGOS.items():
         if key and len(key) >= 4 and key in name_norm:
             return "/static/logos/" + fname
+    # 3. Fallback faviconV2
     for brand, domain in BRAND_DOMAINS.items():
         if brand in name_lower:
             return (
@@ -302,39 +292,6 @@ def logo_url(name):
                 f"&url=https://{domain}&size=128"
             )
     return ""
-
-
-_WEBSITE_CACHE = {}
-
-def get_place_website(place_id, api_key):
-    """Llama a Place Details para obtener el website del negocio."""
-    if not place_id or not api_key:
-        return ""
-    if place_id in _WEBSITE_CACHE:
-        return _WEBSITE_CACHE[place_id]
-    try:
-        r = requests.get(
-            "https://maps.googleapis.com/maps/api/place/details/json",
-            params={"place_id": place_id, "fields": "website", "key": api_key},
-            timeout=5
-        )
-        website = r.json().get("result", {}).get("website", "")
-    except Exception:
-        website = ""
-    _WEBSITE_CACHE[place_id] = website
-    return website
-
-def favicon_from_url(website):
-    if not website:
-        return ""
-    domain = re.sub(r"^https?://", "", website).split("/")[0].lstrip("www.")
-    if not domain:
-        return ""
-    return (
-        f"https://t2.gstatic.com/faviconV2"
-        f"?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL"
-        f"&url=https://{domain}&size=128"
-    )
 
 
 @app.route("/api/config")
@@ -348,6 +305,7 @@ def index():
     template_path = os.path.join(os.path.dirname(__file__), 'templates', 'index.html')
     with open(template_path, 'r', encoding='utf-8') as f:
         html = f.read()
+    # Ocultar campo de API key si el servidor ya tiene la key configurada
     if SERVER_API_KEY:
         html = html.replace(
             'id="apikey-group">',
@@ -373,29 +331,20 @@ def keyplan():
 
     places = nearby_places(lat, lng, radius, api_key)
 
+    # Excluir solo tipos claramente no comerciales a pie de calle
     EXCLUIR_TIPOS = {
         'lodging', 'real_estate_agency', 'insurance_agency',
         'lawyer', 'accounting', 'embassy', 'local_government_office',
         'post_office', 'courthouse', 'city_hall', 'police',
-    }
-    TIPOS_CALLE = {
-        'restaurant','cafe','bar','food','bakery','meal_takeaway','meal_delivery',
-        'fast_food','night_club','casino',
-        'clothing_store','shoe_store','book_store','electronics_store',
-        'supermarket','grocery_or_supermarket','convenience_store',
-        'pharmacy','drugstore','jewelry_store','furniture_store',
-        'home_goods_store','hardware_store','bicycle_store','florist',
-        'gift_shop','toy_store','pet_store','store','shopping_mall',
-        'bank','atm','beauty_salon','hair_care','spa','gym',
-        'movie_theater','amusement_park','art_gallery','museum',
-        'hospital','doctor','dentist','optician',
-        'travel_agency',
+        'sublocality', 'locality', 'country', 'route',
+        'street_address', 'premise', 'neighborhood',
     }
 
     def es_pie_de_calle(tipos):
         if any(t in EXCLUIR_TIPOS for t in tipos):
             return False
-        return any(t in TIPOS_CALLE for t in tipos)
+        # Incluir cualquier establecimiento comercial
+        return 'establishment' in tipos or 'point_of_interest' in tipos
 
     places = [p for p in places if es_pie_de_calle(p.get('types', []))]
 
@@ -409,22 +358,22 @@ def keyplan():
             "types": p.get("types", []),
             "color": place_color(p.get("types", [])),
             "category": place_category(p.get("types", [])),
-            "logo": logo_url(p.get("name", "")) or favicon_from_url(
-                get_place_website(p.get("place_id"), api_key)
-            ),
+            "logo": logo_url(p.get("name", "")),
             "open": p.get("opening_hours", {}).get("open_now"),
             "vicinity": p.get("vicinity", ""),
             "lat": p.get("geometry", {}).get("location", {}).get("lat"),
             "lng": p.get("geometry", {}).get("location", {}).get("lng"),
         })
 
+    # Determinar calle objetivo (la calle del inmueble)
     target_street = extract_street(formatted.split(",")[0])
 
-    max_streets = 8 if radius <= 300 else (14 if radius <= 800 else 20)
-    streets_sorted = sorted(by_street.items(), key=lambda x: -len(x[1]))[:max_streets]
+    # Sin límite de calles: mostrar todas
+    streets_sorted = sorted(by_street.items(), key=lambda x: -len(x[1]))
 
-    def top_places(ps):
-        return sorted(ps, key=lambda p: -(p.get("rating") or 0))[:6]
+    # Sin límite de negocios por calle: mostrar todos, ordenados por rating
+    def all_places(ps):
+        return sorted(ps, key=lambda p: -(p.get("rating") or 0))
 
     return jsonify({
         "formatted_address": formatted,
@@ -434,7 +383,7 @@ def keyplan():
         "total": len(places),
         "target_street": target_street,
         "streets": [
-            {"name": s, "places": top_places(ps)}
+            {"name": s, "places": all_places(ps)}
             for s, ps in streets_sorted
         ]
     })
